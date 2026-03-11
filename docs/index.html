@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sigyn — Encrypted Environment Manager for macOS</title>
+  <meta name="description" content="Local-first macOS desktop app and CLI for managing project-specific environment variables from an encrypted local store. Touch ID authentication, AES-256-GCM-SIV encryption, no .env files.">
+  <meta name="theme-color" content="#0b0f14">
+
+  <meta property="og:title" content="sigyn — Encrypted Environment Manager for macOS">
+  <meta property="og:description" content="Keep your secrets encrypted at rest. Launch processes with injected env vars. No .env files.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="app-icon.png">
+
+  <link rel="icon" type="image/png" href="app-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-primary: #0b0f14;
+      --bg-secondary: #111820;
+      --bg-card: #151d28;
+      --bg-card-hover: #1a2433;
+      --accent: #c9a84c;
+      --accent-dim: #a68838;
+      --accent-glow: rgba(201, 168, 76, 0.15);
+      --text-primary: #e4e4ec;
+      --text-secondary: #7e879a;
+      --text-muted: #4a5268;
+      --border: #1e2736;
+      --code-bg: #0d1117;
+      --green: #3fb950;
+      --green-dim: rgba(63, 185, 80, 0.12);
+      --red: #f85149;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: #ddbf6a; }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── Nav ─────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(11, 15, 20, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text-primary);
+    }
+
+    .nav-brand img {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text-primary); }
+
+    .nav-github {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.825rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .nav-github:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .nav-toggle {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    /* ── Hero ────────────────────────────────────── */
+    .hero {
+      padding: 160px 0 100px;
+      text-align: center;
+    }
+
+    .hero-icon {
+      width: 96px;
+      height: 96px;
+      border-radius: 22px;
+      margin-bottom: 28px;
+      box-shadow: 0 0 60px var(--accent-glow), 0 0 120px rgba(201, 168, 76, 0.06);
+    }
+
+    .hero h1 {
+      font-size: 3.5rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 12px;
+    }
+
+    .hero-tagline {
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+      max-width: 540px;
+      margin: 0 auto 16px;
+      line-height: 1.5;
+    }
+
+    .hero-stage {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      background: var(--accent-glow);
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 36px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
+      border: none;
+    }
+
+    .btn:active { transform: scale(0.98); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0b0f14;
+    }
+
+    .btn-primary:hover {
+      background: #d4b45a;
+      color: #0b0f14;
+      box-shadow: 0 4px 24px var(--accent-glow);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--text-muted);
+    }
+
+    /* ── Sections ────────────────────────────────── */
+    section { padding: 80px 0; }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+    }
+
+    .section-desc {
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin-bottom: 48px;
+    }
+
+    /* ── Features ────────────────────────────────── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px 24px;
+      transition: border-color 0.25s, background 0.25s;
+    }
+
+    .feature-card:hover {
+      border-color: var(--text-muted);
+      background: var(--bg-card-hover);
+    }
+
+    .feature-icon {
+      font-size: 1.5rem;
+      margin-bottom: 14px;
+      display: block;
+    }
+
+    .feature-card h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .feature-card p {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+
+    /* ── Security ────────────────────────────────── */
+    #security { background: var(--bg-secondary); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+    .security-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      align-items: start;
+    }
+
+    .security-detail h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .security-detail p {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .key-hierarchy {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.8;
+      color: var(--text-secondary);
+    }
+
+    .key-hierarchy .highlight { color: var(--accent); }
+    .key-hierarchy .green { color: var(--green); }
+    .key-hierarchy .dim { color: var(--text-muted); }
+
+    .encryption-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 8px;
+    }
+
+    .encryption-table th {
+      text-align: left;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .encryption-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .badge-yes {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--green-dim);
+      color: var(--green);
+    }
+
+    .badge-no {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(248, 81, 73, 0.1);
+      color: var(--red);
+    }
+
+    /* ── CLI ─────────────────────────────────────── */
+    .cli-examples {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .cli-example {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .cli-example-header {
+      padding: 10px 16px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .cli-example pre {
+      padding: 16px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.825rem;
+      line-height: 1.7;
+      color: var(--text-primary);
+    }
+
+    .cli-example .prompt { color: var(--accent); }
+    .cli-example .flag { color: var(--green); }
+    .cli-example .string { color: #a5d6ff; }
+    .cli-example .comment { color: var(--text-muted); }
+
+    .cli-note {
+      margin-top: 24px;
+      padding: 16px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: start;
+      gap: 12px;
+    }
+
+    .cli-note-icon {
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* ── Install ─────────────────────────────────── */
+    #install { background: var(--bg-secondary); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+    .install-steps {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .install-step {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px 24px;
+    }
+
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--accent-glow);
+      color: var(--accent);
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .install-step h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .install-step p {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+    }
+
+    .install-step code {
+      display: block;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-primary);
+      overflow-x: auto;
+    }
+
+    .prereq-list {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .prereq-list li {
+      font-size: 0.8rem;
+      padding: 4px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+    }
+
+    /* ── Footer ──────────────────────────────────── */
+    footer {
+      padding: 48px 0;
+      text-align: center;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      list-style: none;
+      margin-bottom: 20px;
+    }
+
+    .footer-links a {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .footer-links a:hover { color: var(--text-primary); }
+
+    .footer-copy {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Responsive ──────────────────────────────── */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav-toggle { display: block; }
+
+      .nav-links.open {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 60px;
+        left: 0;
+        right: 0;
+        background: var(--bg-primary);
+        border-bottom: 1px solid var(--border);
+        padding: 16px 24px;
+        gap: 16px;
+      }
+
+      .hero { padding: 120px 0 60px; }
+      .hero h1 { font-size: 2.5rem; }
+      .hero-tagline { font-size: 1.05rem; }
+
+      .features-grid { grid-template-columns: 1fr; }
+      .security-grid { grid-template-columns: 1fr; }
+      .cli-examples { grid-template-columns: 1fr; }
+      .install-steps { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 480px) {
+      .hero h1 { font-size: 2rem; }
+      .hero-actions { flex-direction: column; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="container">
+    <a href="#" class="nav-brand">
+      <img src="app-icon.png" alt="sigyn icon">
+      sigyn
+    </a>
+    <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="Toggle menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#security">Security</a></li>
+      <li><a href="#cli">CLI</a></li>
+      <li><a href="#install">Install</a></li>
+      <li>
+        <a href="https://github.com/connorguy/sigyn" class="nav-github">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Hero -->
+<header class="hero">
+  <div class="container">
+    <img src="app-icon.png" alt="sigyn" class="hero-icon">
+    <h1>sigyn</h1>
+    <p class="hero-tagline">Encrypted environment manager for macOS.<br>Keep secrets safe. Launch processes clean.</p>
+    <span class="hero-stage">Early Access</span>
+    <div class="hero-actions">
+      <a href="https://github.com/connorguy/sigyn" class="btn btn-primary">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        View on GitHub
+      </a>
+      <a href="#install" class="btn btn-secondary">Install from Source</a>
+    </div>
+  </div>
+</header>
+
+<!-- Features -->
+<section id="features">
+  <div class="container">
+    <div class="section-label">Features</div>
+    <h2 class="section-title">Built for developers who care about secrets</h2>
+    <p class="section-desc">sigyn replaces scattered .env files with an encrypted local store, a desktop UI for managing environments, and a CLI that injects variables directly into child processes.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <span class="feature-icon">&#x1f512;</span>
+        <h3>AES-256-GCM-SIV</h3>
+        <p>Secret values are encrypted at rest with nonce-misuse-resistant authenticated encryption. The master key never leaves macOS Keychain.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#x1f91a;</span>
+        <h3>Touch ID Authentication</h3>
+        <p>Unlock with Touch ID or device password via macOS LocalAuthentication. No app-managed passwords to remember or rotate.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#x1f4c1;</span>
+        <h3>No .env Files</h3>
+        <p>Environment variables are injected directly into child processes via Rust's Command API. Nothing is written to disk in plaintext.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#x2328;&#xfe0f;</span>
+        <h3>CLI Companion</h3>
+        <p>List projects, preview effective environments, and launch processes with injected secrets from the terminal.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#x1f3af;</span>
+        <h3>Multi-Environment</h3>
+        <p>Define local, dev, staging, and prod environments per project. Mix presets with per-entry overrides for flexibility.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#x1f4bb;</span>
+        <h3>Local-First &amp; Native</h3>
+        <p>Built with Tauri 2 and Rust. Data stays on your machine. No accounts, no cloud, no telemetry.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Security -->
+<section id="security">
+  <div class="container">
+    <div class="section-label">Security</div>
+    <h2 class="section-title">Defense in depth, anchored in macOS</h2>
+    <p class="section-desc">sigyn delegates authentication and key storage to the operating system rather than managing its own password or vault.</p>
+
+    <div class="security-grid">
+      <div>
+        <div class="security-detail">
+          <h3>&#x1f511; Key Hierarchy</h3>
+          <div class="key-hierarchy">
+<span class="highlight">macOS Keychain</span>
+  <span class="dim">└─</span> <span class="green">master key</span> <span class="dim">(256-bit random, generated once)</span>
+       <span class="dim">└─</span> per-value encryption <span class="dim">(AES-256-GCM-SIV)</span>
+            <span class="dim">├─</span> random 96-bit nonce per encrypt call
+            <span class="dim">└─</span> ciphertext + auth tag → base64 in SQLite
+          </div>
+        </div>
+
+        <div class="security-detail" style="margin-top: 28px;">
+          <h3>&#x23f1;&#xfe0f; Session Management</h3>
+          <p>The master key is cached in memory only while unlocked. After 5 minutes of inactivity the session expires and all key bytes are zeroized before the memory is released.</p>
+        </div>
+      </div>
+
+      <div>
+        <div class="security-detail">
+          <h3>&#x1f6e1;&#xfe0f; What Gets Encrypted</h3>
+          <table class="encryption-table">
+            <thead><tr><th>Data</th><th>Encrypted</th></tr></thead>
+            <tbody>
+              <tr><td>Entry values (secrets)</td><td><span class="badge-yes">YES</span></td></tr>
+              <tr><td>Project names</td><td><span class="badge-no">NO</span></td></tr>
+              <tr><td>Entry names (keys)</td><td><span class="badge-no">NO</span></td></tr>
+              <tr><td>Environment labels</td><td><span class="badge-no">NO</span></td></tr>
+              <tr><td>Categories / descriptions</td><td><span class="badge-no">NO</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="security-detail" style="margin-top: 28px;">
+          <h3>&#x1f4d6; Full Threat Model</h3>
+          <p>Detailed coverage of encryption, authentication, file permissions, IPC, CSP, CLI safety, and explicit non-goals.</p>
+          <a href="https://github.com/connorguy/sigyn/blob/main/SECURITY.md">Read SECURITY.md &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CLI -->
+<section id="cli">
+  <div class="container">
+    <div class="section-label">CLI</div>
+    <h2 class="section-title">Your secrets, one command away</h2>
+    <p class="section-desc">The bundled CLI authenticates independently through macOS, reads the same encrypted store as the desktop app, and injects environment variables without shell evaluation.</p>
+
+    <div class="cli-examples">
+      <div class="cli-example">
+        <div class="cli-example-header">List projects</div>
+        <pre><span class="prompt">$</span> sigyn list</pre>
+      </div>
+      <div class="cli-example">
+        <div class="cli-example-header">Preview environment</div>
+        <pre><span class="prompt">$</span> sigyn preview <span class="flag">--project</span> <span class="string">"retail-service"</span></pre>
+      </div>
+      <div class="cli-example">
+        <div class="cli-example-header">Run with injected env</div>
+        <pre><span class="prompt">$</span> sigyn run <span class="flag">--project</span> <span class="string">"retail-service"</span> <span class="flag">--</span> uv run python -m retail_service</pre>
+      </div>
+      <div class="cli-example">
+        <div class="cli-example-header">Reset (development only)</div>
+        <pre><span class="prompt">$</span> sigyn reset-test-data <span class="flag">--confirm</span> <span class="string">"delete all data"</span></pre>
+      </div>
+    </div>
+
+    <div class="cli-note">
+      <span class="cli-note-icon">&#x26a0;&#xfe0f;</span>
+      <span>The CLI refuses to inject dangerous env vars like <code style="font-family: var(--font-mono); font-size: 0.8rem; background: var(--code-bg); padding: 2px 6px; border-radius: 4px;">PATH</code>, <code style="font-family: var(--font-mono); font-size: 0.8rem; background: var(--code-bg); padding: 2px 6px; border-radius: 4px;">LD_*</code>, <code style="font-family: var(--font-mono); font-size: 0.8rem; background: var(--code-bg); padding: 2px 6px; border-radius: 4px;">DYLD_*</code>, <code style="font-family: var(--font-mono); font-size: 0.8rem; background: var(--code-bg); padding: 2px 6px; border-radius: 4px;">NODE_OPTIONS</code>, and other process-loading variables for safety.</span>
+    </div>
+  </div>
+</section>
+
+<!-- Install -->
+<section id="install">
+  <div class="container">
+    <div class="section-label">Install</div>
+    <h2 class="section-title">Up and running in minutes</h2>
+    <p class="section-desc">sigyn is currently installed from source. The install script builds the Tauri app, copies it to /Applications, and symlinks the CLI onto your PATH.</p>
+
+    <div class="install-steps">
+      <div class="install-step">
+        <div class="step-number">1</div>
+        <h3>Prerequisites</h3>
+        <p>Make sure you have these installed:</p>
+        <ul class="prereq-list">
+          <li>macOS</li>
+          <li>Node.js + npm</li>
+          <li>Rust toolchain</li>
+          <li>Xcode / CLT</li>
+        </ul>
+      </div>
+      <div class="install-step">
+        <div class="step-number">2</div>
+        <h3>Clone &amp; Install</h3>
+        <p>Clone the repository and run the install script:</p>
+        <code>git clone https://github.com/connorguy/sigyn.git<br>cd sigyn<br>./install.sh</code>
+      </div>
+      <div class="install-step">
+        <div class="step-number">3</div>
+        <h3>Launch</h3>
+        <p>Open the desktop app from /Applications or Spotlight, then unlock with Touch ID.</p>
+        <code>sigyn --help</code>
+      </div>
+      <div class="install-step">
+        <div class="step-number">4</div>
+        <h3>Quick Start</h3>
+        <p>Create a project, add environments and entries, then preview or run with the CLI.</p>
+        <code>sigyn run --project "my-app" -- npm start</code>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <ul class="footer-links">
+      <li><a href="https://github.com/connorguy/sigyn">GitHub</a></li>
+      <li><a href="https://github.com/connorguy/sigyn/blob/main/SECURITY.md">Security</a></li>
+      <li><a href="https://github.com/connorguy/sigyn/blob/main/docs/architecture.md">Architecture</a></li>
+      <li><a href="https://github.com/connorguy/sigyn/blob/main/CONTRIBUTING.md">Contributing</a></li>
+      <li><a href="https://github.com/connorguy/sigyn/blob/main/SUPPORT.md">Support</a></li>
+    </ul>
+    <p class="footer-copy">sigyn &mdash; local-first encrypted environment manager for macOS</p>
+  </div>
+</footer>
+
+</body>
+</html>
