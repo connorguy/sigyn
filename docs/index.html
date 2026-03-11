@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#f7f8fb">
 
   <meta property="og:title" content="sigyn — Encrypted Environment Manager for macOS">
-  <meta property="og:description" content="Keep your secrets encrypted at rest. Launch processes with injected env vars. No .env files.">
+  <meta property="og:description" content="Your .env files belong in the trash. Your secrets belong in a vault. Encrypted env manager for macOS.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="app-icon.png">
 
@@ -717,7 +717,7 @@
       <img src="app-icon.png" alt="sigyn">
     </div>
     <h1>sigyn</h1>
-    <p class="hero-tagline">Encrypted environment manager for macOS.<br>Keep secrets safe. Launch processes clean.</p>
+    <p class="hero-tagline">Your .env files belong in the trash.<br>Your secrets belong in a vault.</p>
     <span class="hero-stage">Apache 2 OSS</span>
     <div class="hero-actions">
       <a href="https://github.com/connorguy/sigyn" class="btn btn-primary">
@@ -733,39 +733,39 @@
 <section id="features">
   <div class="container">
     <div class="section-label">Features</div>
-    <h2 class="section-title">Built for developers who care about secrets</h2>
-    <p class="section-desc">sigyn replaces scattered .env files with an encrypted local store, a desktop UI for managing environments, and a CLI that injects variables directly into child processes.</p>
+    <h2 class="section-title">Stop committing crimes against secrets</h2>
+    <p class="section-desc">Scattered .env files, plaintext tokens in Slack DMs, that one password in a sticky note. sigyn puts all of it in an encrypted local store and injects it straight into your processes.</p>
 
     <div class="features-grid">
       <div class="feature-card">
         <div class="feature-icon">&#x1f512;</div>
         <h3>AES-256-GCM-SIV</h3>
-        <p>Secret values are encrypted at rest with nonce-misuse-resistant authenticated encryption. The master key never leaves macOS Keychain.</p>
+        <p>The kind of encryption that makes cryptographers nod approvingly. Nonce-misuse-resistant, authenticated, and the master key never leaves macOS Keychain.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">&#x1f91a;</div>
         <h3>Touch ID Authentication</h3>
-        <p>Unlock with Touch ID or device password via macOS LocalAuthentication. No app-managed passwords to remember or rotate.</p>
+        <p>One fingerprint. That's the whole auth flow. Falls back to your device password, but never asks you to invent yet another password.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">&#x1f4c1;</div>
         <h3>No .env Files</h3>
-        <p>Environment variables are injected directly into child processes via Rust's Command API. Nothing is written to disk in plaintext.</p>
+        <p>Env vars go straight from the encrypted store into your child process. Nothing touches disk. Nothing leaks into git. Your .gitignore can finally relax.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">&#x2328;&#xfe0f;</div>
         <h3>CLI Companion</h3>
-        <p>List projects, preview effective environments, and launch processes with injected secrets from the terminal.</p>
+        <p>For the terminal dwellers. List projects, peek at your effective env, and launch processes with secrets injected — all without leaving the shell.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">&#x1f3af;</div>
         <h3>Multi-Environment</h3>
-        <p>Define local, dev, staging, and prod environments per project. Mix presets with per-entry overrides for flexibility.</p>
+        <p>local, dev, staging, prod — all living side by side. Mix and match base presets with per-entry overrides when reality gets messy.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">&#x1f4bb;</div>
         <h3>Local-First &amp; Native</h3>
-        <p>Built with Tauri 2 and Rust. Data stays on your machine. No accounts, no cloud, no telemetry.</p>
+        <p>Tauri 2 + Rust under the hood. Your data never leaves your machine. No accounts, no cloud, no "we value your privacy" banners.</p>
       </div>
     </div>
   </div>
@@ -775,8 +775,8 @@
 <section id="security">
   <div class="container">
     <div class="section-label">Security</div>
-    <h2 class="section-title">Defense in depth, anchored in macOS</h2>
-    <p class="section-desc">sigyn delegates authentication and key storage to the operating system rather than managing its own password or vault.</p>
+    <h2 class="section-title">Let Apple do the hard parts</h2>
+    <p class="section-desc">Why roll your own auth when macOS already has Keychain and Touch ID? sigyn leans on the OS for the trust-sensitive bits so it doesn't have to.</p>
 
     <div class="security-grid">
       <div>
@@ -793,7 +793,7 @@
 
         <div class="security-detail" style="margin-top: 28px;">
           <h3>&#x23f1;&#xfe0f; Session Management</h3>
-          <p>The master key is cached in memory only while unlocked. After 5 minutes of inactivity the session expires and all key bytes are zeroized before the memory is released.</p>
+          <p>Walk away from your laptop? The master key evicts itself from memory after 5 idle minutes and zeroizes every byte on the way out. No crumbs left behind.</p>
         </div>
       </div>
 
@@ -814,7 +814,7 @@
 
         <div class="security-detail" style="margin-top: 28px;">
           <h3>&#x1f4d6; Full Threat Model</h3>
-          <p>Detailed coverage of encryption, authentication, file permissions, IPC, CSP, CLI safety, and explicit non-goals.</p>
+          <p>The whole story — encryption, auth, file permissions, IPC, CSP, CLI safety, and all the things sigyn deliberately doesn't try to do.</p>
           <a href="https://github.com/connorguy/sigyn/blob/main/SECURITY.md">Read SECURITY.md &rarr;</a>
         </div>
       </div>
@@ -826,8 +826,8 @@
 <section id="cli">
   <div class="container">
     <div class="section-label">CLI</div>
-    <h2 class="section-title">Your secrets, one command away</h2>
-    <p class="section-desc">The bundled CLI authenticates independently through macOS, reads the same encrypted store as the desktop app, and injects environment variables without shell evaluation.</p>
+    <h2 class="section-title">GUI optional, terminal encouraged</h2>
+    <p class="section-desc">The bundled CLI does its own Touch ID check, reads the same encrypted store as the desktop app, and pipes env vars into your process. No shell eval, no intermediate files, no drama.</p>
 
     <div class="cli-examples">
       <div class="cli-example">
@@ -850,7 +850,7 @@
 
     <div class="cli-note">
       <span class="cli-note-icon">&#x26a0;&#xfe0f;</span>
-      <span>The CLI refuses to inject dangerous env vars like <code>PATH</code>, <code>LD_*</code>, <code>DYLD_*</code>, <code>NODE_OPTIONS</code>, and other process-loading variables for safety.</span>
+      <span>sigyn won't let you shoot yourself in the foot — it refuses to inject <code>PATH</code>, <code>LD_*</code>, <code>DYLD_*</code>, <code>NODE_OPTIONS</code>, and other process-loading vars that could ruin your day.</span>
     </div>
   </div>
 </section>
@@ -859,14 +859,14 @@
 <section id="install">
   <div class="container">
     <div class="section-label">Install</div>
-    <h2 class="section-title">Up and running in minutes</h2>
-    <p class="section-desc">sigyn is currently installed from source. The install script builds the Tauri app, copies it to /Applications, and symlinks the CLI onto your PATH.</p>
+    <h2 class="section-title">Clone, build, done</h2>
+    <p class="section-desc">One script handles the whole thing — builds the Tauri app, drops it in /Applications, and symlinks the CLI onto your PATH. Go grab coffee while Rust compiles.</p>
 
     <div class="install-steps">
       <div class="install-step">
         <div class="step-number">01</div>
         <h3>Prerequisites</h3>
-        <p>Make sure you have these installed:</p>
+        <p>The usual suspects:</p>
         <ul class="prereq-list">
           <li>macOS</li>
           <li>Node.js + npm</li>
@@ -877,19 +877,19 @@
       <div class="install-step">
         <div class="step-number">02</div>
         <h3>Clone &amp; Install</h3>
-        <p>Clone the repository and run the install script:</p>
+        <p>Three lines and a cup of patience:</p>
         <code>git clone https://github.com/connorguy/sigyn.git<br>cd sigyn<br>./install.sh</code>
       </div>
       <div class="install-step">
         <div class="step-number">03</div>
         <h3>Launch</h3>
-        <p>Open the desktop app from /Applications or Spotlight, then unlock with Touch ID.</p>
+        <p>Fire it up from /Applications or Spotlight. Touch ID gets you in.</p>
         <code>sigyn --help</code>
       </div>
       <div class="install-step">
         <div class="step-number">04</div>
         <h3>Quick Start</h3>
-        <p>Create a project, add environments and entries, then preview or run with the CLI.</p>
+        <p>Create a project, throw in some secrets, and let sigyn handle the rest.</p>
         <code>sigyn run --project "my-app" -- npm start</code>
       </div>
     </div>
