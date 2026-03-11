@@ -318,6 +318,465 @@
       font-size: 0.95rem;
     }
 
+    /* App Mockup */
+    .mockup-section {
+      padding: 0 0 80px;
+      margin-top: -40px;
+    }
+
+    .mockup-window {
+      max-width: 960px;
+      margin: 0 auto;
+      border-radius: 16px;
+      border: 1px solid var(--border-strong);
+      background: var(--bg);
+      box-shadow: var(--shadow), 0 0 0 1px rgba(0, 0, 0, 0.04);
+      overflow: hidden;
+    }
+
+    .mockup-titlebar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 18px;
+      background: linear-gradient(180deg, #f0f2f5, #e8eaee);
+      border-bottom: 1px solid var(--border-strong);
+    }
+
+    .mockup-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .mockup-dot--close { background: #ff5f57; }
+    .mockup-dot--min { background: #febc2e; }
+    .mockup-dot--max { background: #28c840; }
+
+    .mockup-titlebar-text {
+      flex: 1;
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: -0.01em;
+    }
+
+    .mockup-body {
+      display: flex;
+      min-height: 440px;
+    }
+
+    .mockup-sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: linear-gradient(180deg, #eaecf0, var(--sidebar));
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+    }
+
+    .mockup-sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mockup-sidebar-brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 2px;
+    }
+
+    .mockup-sidebar-brand-text {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+
+    .mockup-sidebar-label {
+      font-family: var(--font-mono);
+      font-size: 0.64rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 14px 16px 8px;
+    }
+
+    .mockup-sidebar-label::before {
+      content: "// ";
+      color: var(--accent);
+    }
+
+    .mockup-sidebar-nav {
+      flex: 1;
+      padding: 0 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .mockup-project {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      font-size: 0.82rem;
+      color: var(--muted);
+      transition: background 0.15s;
+    }
+
+    .mockup-project--active {
+      background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 100%);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 4px 12px rgba(10, 127, 203, 0.25);
+    }
+
+    .mockup-project-num {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 700;
+      opacity: 0.6;
+      min-width: 18px;
+    }
+
+    .mockup-project--active .mockup-project-num { opacity: 0.75; }
+
+    .mockup-project-name {
+      font-weight: 600;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .mockup-project-badge {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    .mockup-project--active .mockup-project-badge {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    .mockup-sidebar-footer {
+      padding: 12px 8px;
+      border-top: 1px solid var(--border);
+      margin-top: auto;
+    }
+
+    .mockup-add-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding: 9px;
+      border-radius: 12px;
+      border: 1px dashed var(--border-strong);
+      background: rgba(255, 255, 255, 0.5);
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .mockup-workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: rgba(255, 255, 255, 0.28);
+      backdrop-filter: blur(24px);
+      overflow: hidden;
+    }
+
+    .mockup-ws-header {
+      padding: 20px 24px 0;
+    }
+
+    .mockup-ws-topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .mockup-ws-title {
+      font-size: 1.65rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+    }
+
+    .mockup-ws-subtitle {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .mockup-ws-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .mockup-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--muted);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    }
+
+    .mockup-btn--primary {
+      background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 100%);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 4px 12px rgba(10, 127, 203, 0.2);
+    }
+
+    .mockup-btn--danger {
+      color: var(--danger);
+      border-color: var(--danger-border);
+      background: var(--danger-soft);
+    }
+
+    .mockup-envbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 12px;
+    }
+
+    .mockup-env-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      border: 1px solid transparent;
+      cursor: default;
+    }
+
+    .mockup-env-pill::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .mockup-env-pill--local::before { background: var(--success); }
+    .mockup-env-pill--dev::before { background: var(--warning); }
+    .mockup-env-pill--staging::before { background: var(--accent); }
+    .mockup-env-pill--prod::before { background: #8b8fa3; }
+
+    .mockup-env-pill--active {
+      background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 100%);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(10, 127, 203, 0.22);
+    }
+
+    .mockup-env-pill--active::before { background: rgba(255, 255, 255, 0.7); }
+
+    .mockup-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .mockup-search {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.7);
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .mockup-search svg { opacity: 0.45; flex-shrink: 0; }
+
+    .mockup-ws-content {
+      flex: 1;
+      padding: 0 24px 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mockup-entry {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .mockup-entry-num {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 700;
+      color: var(--muted);
+      opacity: 0.5;
+      min-width: 20px;
+      text-align: center;
+    }
+
+    .mockup-entry-chevron {
+      color: var(--muted);
+      opacity: 0.35;
+      flex-shrink: 0;
+    }
+
+    .mockup-entry-name {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .mockup-status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .mockup-status-dot--ok { background: var(--success); }
+    .mockup-status-dot--missing { background: var(--danger); }
+
+    .mockup-entry-meta {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-left: -4px;
+    }
+
+    .mockup-entry-spacer { flex: 1; }
+
+    .mockup-entry-env {
+      font-family: var(--font-mono);
+      font-size: 0.64rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(245, 247, 249, 0.9);
+      color: var(--muted);
+    }
+
+    .mockup-entry-value {
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      padding: 5px 14px;
+      border-radius: 999px;
+      border: 1px dashed var(--border-strong);
+      color: var(--muted);
+      background: rgba(245, 247, 249, 0.6);
+      letter-spacing: 0.08em;
+    }
+
+    .mockup-entry-value--missing {
+      color: var(--danger);
+      border-color: var(--danger-border);
+      background: var(--danger-soft);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .mockup-menubar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      max-width: 960px;
+      margin: 0 auto 8px;
+      padding: 6px 14px;
+      background: rgba(30, 34, 42, 0.82);
+      border-radius: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.85);
+      gap: 16px;
+      letter-spacing: -0.01em;
+    }
+
+    .mockup-menubar-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-right: auto;
+      color: rgba(255, 255, 255, 0.5);
+      font-weight: 500;
+      font-size: 0.7rem;
+    }
+
+    .mockup-menubar-tray {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    @media (max-width: 768px) {
+      .mockup-window { border-radius: 12px; }
+      .mockup-sidebar { display: none; }
+      .mockup-body { min-height: 340px; }
+      .mockup-ws-topbar { flex-direction: column; gap: 10px; }
+      .mockup-ws-actions { align-self: flex-start; }
+      .mockup-entry { flex-wrap: wrap; gap: 8px; }
+      .mockup-entry-spacer { display: none; }
+      .mockup-menubar { border-radius: 8px; font-size: 0.66rem; }
+    }
+
     /* Features */
     .features-grid {
       display: grid;
@@ -731,6 +1190,161 @@
   </div>
 </header>
 
+<!-- App Mockup -->
+<div class="mockup-section">
+  <div class="container">
+    <div class="mockup-menubar">
+      <span class="mockup-menubar-left">
+        <span>&#63743; Finder &nbsp;File &nbsp;Edit &nbsp;View</span>
+      </span>
+      <span class="mockup-menubar-tray">&#x1f512; [big-service | local]</span>
+      <span style="opacity: 0.5;">Wed 3:42 PM</span>
+    </div>
+    <div class="mockup-window">
+      <div class="mockup-titlebar">
+        <span class="mockup-dot mockup-dot--close"></span>
+        <span class="mockup-dot mockup-dot--min"></span>
+        <span class="mockup-dot mockup-dot--max"></span>
+        <span class="mockup-titlebar-text">sigyn</span>
+        <span style="width: 52px;"></span>
+      </div>
+      <div class="mockup-body">
+        <div class="mockup-sidebar">
+          <div class="mockup-sidebar-brand">
+            <img class="mockup-sidebar-brand-icon" src="app-icon.png" alt="">
+            <span class="mockup-sidebar-brand-text">Sigyn</span>
+          </div>
+          <div class="mockup-sidebar-label">Projects</div>
+          <div class="mockup-sidebar-nav">
+            <div class="mockup-project mockup-project--active">
+              <span class="mockup-project-num">01</span>
+              <span class="mockup-project-name">big-service</span>
+              <span class="mockup-project-badge">5</span>
+            </div>
+            <div class="mockup-project">
+              <span class="mockup-project-num">02</span>
+              <span class="mockup-project-name">auth-gateway</span>
+              <span class="mockup-project-badge">3</span>
+            </div>
+            <div class="mockup-project">
+              <span class="mockup-project-num">03</span>
+              <span class="mockup-project-name">billing-api</span>
+              <span class="mockup-project-badge">7</span>
+            </div>
+          </div>
+          <div class="mockup-sidebar-footer">
+            <div class="mockup-add-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              Add Project
+            </div>
+          </div>
+        </div>
+
+        <div class="mockup-workspace">
+          <div class="mockup-ws-header">
+            <div class="mockup-ws-topbar">
+              <div>
+                <div class="mockup-ws-title">big-service</div>
+                <div class="mockup-ws-subtitle">5 entries &middot; 4 environments</div>
+              </div>
+              <div class="mockup-ws-actions">
+                <div class="mockup-btn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                  Edit
+                </div>
+                <div class="mockup-btn">Preview</div>
+                <div class="mockup-btn mockup-btn--primary">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                  Copy
+                </div>
+                <div class="mockup-btn mockup-btn--danger">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+                  Lock
+                </div>
+              </div>
+            </div>
+
+            <div class="mockup-envbar">
+              <span class="mockup-env-pill mockup-env-pill--local mockup-env-pill--active">Local</span>
+              <span class="mockup-env-pill mockup-env-pill--dev">Dev</span>
+              <span class="mockup-env-pill mockup-env-pill--staging">Staging</span>
+              <span class="mockup-env-pill mockup-env-pill--prod">Prod</span>
+            </div>
+
+            <div class="mockup-toolbar">
+              <div class="mockup-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                Search entries&hellip;
+              </div>
+              <div class="mockup-btn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                Import
+              </div>
+              <div class="mockup-btn mockup-btn--primary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                Add Entry
+              </div>
+            </div>
+          </div>
+
+          <div class="mockup-ws-content">
+            <div class="mockup-entry">
+              <span class="mockup-entry-num">01</span>
+              <span class="mockup-entry-chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+              <span class="mockup-entry-name">DATABASE_URL</span>
+              <span class="mockup-status-dot mockup-status-dot--ok"></span>
+              <span class="mockup-entry-meta">database</span>
+              <span class="mockup-entry-spacer"></span>
+              <span class="mockup-entry-env">Local</span>
+              <span class="mockup-entry-value">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
+            </div>
+            <div class="mockup-entry">
+              <span class="mockup-entry-num">02</span>
+              <span class="mockup-entry-chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+              <span class="mockup-entry-name">API_TOKEN</span>
+              <span class="mockup-status-dot mockup-status-dot--ok"></span>
+              <span class="mockup-entry-meta">auth</span>
+              <span class="mockup-entry-spacer"></span>
+              <span class="mockup-entry-env">Local</span>
+              <span class="mockup-entry-value">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
+            </div>
+            <div class="mockup-entry">
+              <span class="mockup-entry-num">03</span>
+              <span class="mockup-entry-chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+              <span class="mockup-entry-name">REDIS_URL</span>
+              <span class="mockup-status-dot mockup-status-dot--ok"></span>
+              <span class="mockup-entry-meta">cache</span>
+              <span class="mockup-entry-spacer"></span>
+              <span class="mockup-entry-env">Local</span>
+              <span class="mockup-entry-value">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
+            </div>
+            <div class="mockup-entry">
+              <span class="mockup-entry-num">04</span>
+              <span class="mockup-entry-chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+              <span class="mockup-entry-name">STRIPE_SECRET</span>
+              <span class="mockup-status-dot mockup-status-dot--ok"></span>
+              <span class="mockup-entry-meta">payments</span>
+              <span class="mockup-entry-spacer"></span>
+              <span class="mockup-entry-env">Local</span>
+              <span class="mockup-entry-value">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
+            </div>
+            <div class="mockup-entry">
+              <span class="mockup-entry-num">05</span>
+              <span class="mockup-entry-chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+              <span class="mockup-entry-name">WEBHOOK_SECRET</span>
+              <span class="mockup-status-dot mockup-status-dot--missing"></span>
+              <span class="mockup-entry-meta">webhooks</span>
+              <span class="mockup-entry-spacer"></span>
+              <span class="mockup-entry-env">Local</span>
+              <span class="mockup-entry-value mockup-entry-value--missing">not set</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Features -->
 <section id="features">
   <div class="container">
@@ -768,6 +1382,11 @@
         <div class="feature-icon">&#x1f4bb;</div>
         <h3>Local-First &amp; Native</h3>
         <p>Tauri 2 + Rust under the hood. Your data never leaves your machine. No accounts, no cloud, no "we value your privacy" banners.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#x1f4cc;</div>
+        <h3>Menu Bar Visibility</h3>
+        <p>Always-visible system tray shows your active project and environment at a glance. Switch projects, change environments, lock, or reset overrides without opening the window.</p>
       </div>
     </div>
   </div>
@@ -838,11 +1457,11 @@
       </div>
       <div class="cli-example">
         <div class="cli-example-header">Preview environment</div>
-        <pre><span class="prompt">$</span> sigyn preview <span class="flag">--project</span> <span class="string">"retail-service"</span></pre>
+        <pre><span class="prompt">$</span> sigyn preview <span class="flag">--project</span> <span class="string">"big-service"</span></pre>
       </div>
       <div class="cli-example">
         <div class="cli-example-header">Run with injected env</div>
-        <pre><span class="prompt">$</span> sigyn run <span class="flag">--project</span> <span class="string">"retail-service"</span> <span class="flag">--</span> uv run python -m retail_service</pre>
+        <pre><span class="prompt">$</span> sigyn run <span class="flag">--project</span> <span class="string">"big-service"</span> <span class="flag">--</span> uv run python -m retail_service</pre>
       </div>
       <div class="cli-example">
         <div class="cli-example-header">Reset (development only)</div>
