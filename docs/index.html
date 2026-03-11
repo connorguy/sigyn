@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>sigyn — Encrypted Environment Manager for macOS</title>
   <meta name="description" content="Local-first macOS desktop app and CLI for managing project-specific environment variables from an encrypted local store. Touch ID authentication, AES-256-GCM-SIV encryption, no .env files.">
-  <meta name="theme-color" content="#0b0f14">
+  <meta name="theme-color" content="#f7f8fb">
 
   <meta property="og:title" content="sigyn — Encrypted Environment Manager for macOS">
   <meta property="og:description" content="Keep your secrets encrypted at rest. Launch processes with injected env vars. No .env files.">
@@ -15,48 +15,82 @@
   <link rel="icon" type="image/png" href="app-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg-primary: #0b0f14;
-      --bg-secondary: #111820;
-      --bg-card: #151d28;
-      --bg-card-hover: #1a2433;
-      --accent: #c9a84c;
-      --accent-dim: #a68838;
-      --accent-glow: rgba(201, 168, 76, 0.15);
-      --text-primary: #e4e4ec;
-      --text-secondary: #7e879a;
-      --text-muted: #4a5268;
-      --border: #1e2736;
-      --code-bg: #0d1117;
-      --green: #3fb950;
-      --green-dim: rgba(63, 185, 80, 0.12);
-      --red: #f85149;
-      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      --bg: #eceff3;
+      --surface: #f5f7f9;
+      --surface-strong: #ffffff;
+      --sidebar: #e4e9ee;
+      --border: rgba(28, 34, 43, 0.12);
+      --border-strong: rgba(28, 34, 43, 0.22);
+      --text: #1d232c;
+      --muted: rgba(29, 35, 44, 0.62);
+      --accent: #0a7fcb;
+      --accent-strong: #045f9d;
+      --accent-fg: #ffffff;
+      --accent-soft: rgba(10, 127, 203, 0.1);
+      --accent-soft-strong: rgba(10, 127, 203, 0.16);
+      --accent-ring: rgba(10, 127, 203, 0.22);
+      --accent-border-soft: rgba(10, 127, 203, 0.24);
+      --success: #1aa352;
+      --success-soft: rgba(26, 163, 82, 0.1);
+      --success-border: rgba(26, 163, 82, 0.24);
+      --warning: #ef9c32;
+      --warning-soft: rgba(239, 156, 50, 0.12);
+      --warning-border: rgba(239, 156, 50, 0.26);
+      --danger: #f05e3a;
+      --danger-soft: rgba(240, 94, 58, 0.1);
+      --danger-border: rgba(240, 94, 58, 0.24);
+      --shadow: 0 24px 60px rgba(28, 34, 43, 0.12);
+      --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.8), 0 14px 28px rgba(28, 34, 43, 0.08);
+      --radius-xl: 32px;
+      --radius-lg: 24px;
+      --radius-md: 20px;
+      --radius-sm: 14px;
+      --radius-base: 18px;
+      --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'IBM Plex Mono', 'SFMono-Regular', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
     }
 
     html { scroll-behavior: smooth; }
 
     body {
       font-family: var(--font-sans);
-      background: var(--bg-primary);
-      color: var(--text-primary);
+      background:
+        radial-gradient(circle at 16% 12%, rgba(10, 127, 203, 0.08) 0%, transparent 22%),
+        radial-gradient(circle at 84% 0%, rgba(239, 156, 50, 0.08) 0%, transparent 18%),
+        linear-gradient(180deg, #f7f8fb 0%, var(--bg) 100%);
+      color: var(--text);
       line-height: 1.6;
+      letter-spacing: -0.01em;
       -webkit-font-smoothing: antialiased;
     }
 
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: radial-gradient(rgba(29, 35, 44, 0.08) 0.7px, transparent 0.7px);
+      background-size: 22px 22px;
+      opacity: 0.15;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 72%);
+      z-index: 0;
+    }
+
     a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
-    a:hover { color: #ddbf6a; }
+    a:hover { color: var(--accent-strong); }
 
     .container {
       max-width: 1100px;
       margin: 0 auto;
       padding: 0 24px;
+      position: relative;
+      z-index: 1;
     }
 
     /* ── Nav ─────────────────────────────────────── */
@@ -66,7 +100,7 @@
       left: 0;
       right: 0;
       z-index: 100;
-      background: rgba(11, 15, 20, 0.85);
+      background: rgba(247, 248, 251, 0.8);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
@@ -83,15 +117,22 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      font-family: var(--font-mono);
       font-weight: 700;
-      font-size: 1.1rem;
-      color: var(--text-primary);
+      font-size: 0.95rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text);
     }
 
     .nav-brand img {
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: var(--shadow-card);
+      padding: 2px;
     }
 
     .nav-links {
@@ -102,37 +143,40 @@
     }
 
     .nav-links a {
-      color: var(--text-secondary);
+      color: var(--muted);
       font-size: 0.875rem;
       font-weight: 500;
       transition: color 0.2s;
     }
 
-    .nav-links a:hover { color: var(--text-primary); }
+    .nav-links a:hover { color: var(--text); }
 
     .nav-github {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 6px 14px;
+      padding: 8px 16px;
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 999px;
       font-size: 0.825rem;
-      font-weight: 500;
-      color: var(--text-secondary);
-      transition: border-color 0.2s, color 0.2s;
+      font-weight: 600;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.8);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+      transition: border-color 0.2s, color 0.2s, transform 0.12s;
     }
 
     .nav-github:hover {
-      border-color: var(--text-muted);
-      color: var(--text-primary);
+      border-color: var(--border-strong);
+      color: var(--text);
+      transform: translateY(-1px);
     }
 
     .nav-toggle {
       display: none;
       background: none;
       border: none;
-      color: var(--text-secondary);
+      color: var(--muted);
       cursor: pointer;
       padding: 4px;
     }
@@ -143,39 +187,54 @@
       text-align: center;
     }
 
-    .hero-icon {
-      width: 96px;
-      height: 96px;
-      border-radius: 22px;
+    .hero-icon-wrap {
+      display: inline-grid;
+      place-items: center;
+      width: 104px;
+      height: 104px;
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: var(--shadow-card);
       margin-bottom: 28px;
-      box-shadow: 0 0 60px var(--accent-glow), 0 0 120px rgba(201, 168, 76, 0.06);
+    }
+
+    .hero-icon-wrap img {
+      width: 80px;
+      height: 80px;
+      border-radius: 18px;
     }
 
     .hero h1 {
-      font-size: 3.5rem;
+      font-size: clamp(3rem, 9vw, 4.2rem);
       font-weight: 700;
-      letter-spacing: -0.03em;
-      margin-bottom: 12px;
+      letter-spacing: -0.06em;
+      line-height: 0.95;
+      margin-bottom: 16px;
     }
 
     .hero-tagline {
-      font-size: 1.25rem;
-      color: var(--text-secondary);
-      max-width: 540px;
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 480px;
       margin: 0 auto 16px;
       line-height: 1.5;
     }
 
     .hero-stage {
-      display: inline-block;
-      font-size: 0.75rem;
-      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
       color: var(--accent);
-      background: var(--accent-glow);
-      padding: 4px 12px;
-      border-radius: 20px;
+      background: var(--accent-soft-strong);
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--accent-border-soft);
       margin-bottom: 36px;
     }
 
@@ -189,64 +248,74 @@
     .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
-      padding: 12px 24px;
-      border-radius: 10px;
+      padding: 14px 26px;
+      border-radius: 999px;
       font-size: 0.9rem;
-      font-weight: 600;
+      font-weight: 700;
       font-family: var(--font-sans);
       cursor: pointer;
-      transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
-      border: none;
+      border: 1px solid transparent;
+      letter-spacing: -0.01em;
+      box-shadow: var(--shadow-card);
+      transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.12s ease, border-color 0.12s ease;
     }
 
+    .btn:hover { transform: translateY(-1px); }
     .btn:active { transform: scale(0.98); }
 
     .btn-primary {
-      background: var(--accent);
-      color: #0b0f14;
+      background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 100%);
+      color: var(--accent-fg);
+      box-shadow: 0 14px 26px rgba(10, 127, 203, 0.2);
     }
 
     .btn-primary:hover {
-      background: #d4b45a;
-      color: #0b0f14;
-      box-shadow: 0 4px 24px var(--accent-glow);
+      box-shadow: 0 18px 32px rgba(10, 127, 203, 0.28);
     }
 
     .btn-secondary {
-      background: var(--bg-card);
-      color: var(--text-primary);
-      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--text);
+      border-color: var(--border);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
     }
 
     .btn-secondary:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--text-muted);
+      border-color: var(--border-strong);
     }
 
     /* ── Sections ────────────────────────────────── */
     section { padding: 80px 0; }
 
     .section-label {
-      font-size: 0.75rem;
-      font-weight: 600;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      color: var(--accent);
+      color: var(--muted);
       margin-bottom: 12px;
+    }
+
+    .section-label::before {
+      content: "// ";
+      color: var(--accent);
     }
 
     .section-title {
       font-size: 2rem;
       font-weight: 700;
-      letter-spacing: -0.02em;
-      margin-bottom: 16px;
+      letter-spacing: -0.04em;
+      margin-bottom: 12px;
     }
 
     .section-desc {
-      color: var(--text-secondary);
+      color: var(--muted);
       max-width: 600px;
       margin-bottom: 48px;
+      font-size: 0.95rem;
     }
 
     /* ── Features ────────────────────────────────── */
@@ -257,38 +326,51 @@
     }
 
     .feature-card {
-      background: var(--bg-card);
+      background: rgba(255, 255, 255, 0.92);
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 28px;
       padding: 28px 24px;
-      transition: border-color 0.25s, background 0.25s;
+      box-shadow: var(--shadow-card);
+      transition: border-color 0.2s, transform 0.12s;
     }
 
     .feature-card:hover {
-      border-color: var(--text-muted);
-      background: var(--bg-card-hover);
+      border-color: var(--border-strong);
+      transform: translateY(-2px);
     }
 
     .feature-icon {
-      font-size: 1.5rem;
-      margin-bottom: 14px;
-      display: block;
+      display: grid;
+      place-items: center;
+      width: 2.8rem;
+      height: 2.8rem;
+      border-radius: var(--radius-base);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 1.25rem;
+      margin-bottom: 16px;
     }
 
     .feature-card h3 {
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 700;
+      letter-spacing: -0.02em;
       margin-bottom: 8px;
     }
 
     .feature-card p {
       font-size: 0.875rem;
-      color: var(--text-secondary);
+      color: var(--muted);
       line-height: 1.55;
     }
 
     /* ── Security ────────────────────────────────── */
-    #security { background: var(--bg-secondary); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    #security {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, var(--sidebar) 100%);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
 
     .security-grid {
       display: grid;
@@ -299,34 +381,36 @@
 
     .security-detail h3 {
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 700;
       margin-bottom: 10px;
       display: flex;
       align-items: center;
       gap: 8px;
+      letter-spacing: -0.02em;
     }
 
     .security-detail p {
       font-size: 0.875rem;
-      color: var(--text-secondary);
+      color: var(--muted);
       line-height: 1.6;
       margin-bottom: 20px;
     }
 
     .key-hierarchy {
-      background: var(--code-bg);
+      background: rgba(255, 255, 255, 0.88);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: var(--radius-lg);
       padding: 24px;
       font-family: var(--font-mono);
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       line-height: 1.8;
-      color: var(--text-secondary);
+      color: var(--muted);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
     }
 
-    .key-hierarchy .highlight { color: var(--accent); }
-    .key-hierarchy .green { color: var(--green); }
-    .key-hierarchy .dim { color: var(--text-muted); }
+    .key-hierarchy .highlight { color: var(--accent); font-weight: 600; }
+    .key-hierarchy .green { color: var(--success); font-weight: 600; }
+    .key-hierarchy .dim { color: rgba(29, 35, 44, 0.35); }
 
     .encryption-table {
       width: 100%;
@@ -337,39 +421,48 @@
 
     .encryption-table th {
       text-align: left;
-      font-weight: 600;
+      font-family: var(--font-mono);
+      font-weight: 700;
       padding: 8px 12px;
       border-bottom: 1px solid var(--border);
-      color: var(--text-secondary);
-      font-size: 0.75rem;
+      color: var(--muted);
+      font-size: 0.72rem;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
     }
 
     .encryption-table td {
       padding: 8px 12px;
       border-bottom: 1px solid var(--border);
-      color: var(--text-secondary);
+      color: var(--muted);
     }
 
     .badge-yes {
       display: inline-block;
-      font-size: 0.72rem;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 4px;
-      background: var(--green-dim);
-      color: var(--green);
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--success-soft);
+      color: var(--success);
+      border: 1px solid var(--success-border);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
 
     .badge-no {
       display: inline-block;
-      font-size: 0.72rem;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 4px;
-      background: rgba(248, 81, 73, 0.1);
-      color: var(--red);
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--danger-soft);
+      color: var(--danger);
+      border: 1px solid var(--danger-border);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
 
     /* ── CLI ─────────────────────────────────────── */
@@ -380,44 +473,46 @@
     }
 
     .cli-example {
-      background: var(--code-bg);
+      background: rgba(255, 255, 255, 0.88);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: var(--radius-lg);
       overflow: hidden;
+      box-shadow: var(--shadow-card);
     }
 
     .cli-example-header {
       padding: 10px 16px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--muted);
       border-bottom: 1px solid var(--border);
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
+      background: var(--surface);
     }
 
     .cli-example pre {
       padding: 16px;
       overflow-x: auto;
       font-family: var(--font-mono);
-      font-size: 0.825rem;
+      font-size: 0.82rem;
       line-height: 1.7;
-      color: var(--text-primary);
+      color: var(--text);
     }
 
-    .cli-example .prompt { color: var(--accent); }
-    .cli-example .flag { color: var(--green); }
-    .cli-example .string { color: #a5d6ff; }
-    .cli-example .comment { color: var(--text-muted); }
+    .cli-example .prompt { color: var(--accent); font-weight: 600; }
+    .cli-example .flag { color: var(--success); }
+    .cli-example .string { color: var(--accent-strong); }
 
     .cli-note {
       margin-top: 24px;
       padding: 16px 20px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      background: var(--warning-soft);
+      border: 1px solid var(--warning-border);
+      border-radius: var(--radius-md);
       font-size: 0.875rem;
-      color: var(--text-secondary);
+      color: #ad6514;
       display: flex;
       align-items: start;
       gap: 12px;
@@ -429,58 +524,78 @@
       margin-top: 1px;
     }
 
+    .cli-note code {
+      font-family: var(--font-mono);
+      font-size: 0.82em;
+      background: rgba(255, 255, 255, 0.6);
+      padding: 2px 7px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--warning-border);
+    }
+
     /* ── Install ─────────────────────────────────── */
-    #install { background: var(--bg-secondary); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    #install {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, var(--sidebar) 100%);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
 
     .install-steps {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 24px;
+      gap: 16px;
     }
 
     .install-step {
-      background: var(--bg-card);
+      background: rgba(255, 255, 255, 0.92);
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 28px;
       padding: 28px 24px;
+      box-shadow: var(--shadow-card);
     }
 
     .step-number {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
-      background: var(--accent-glow);
+      width: 2rem;
+      height: 2rem;
+      border-radius: 999px;
+      border: 1px solid var(--accent-border-soft);
+      background: var(--accent-soft-strong);
       color: var(--accent);
-      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
       font-weight: 700;
+      letter-spacing: 0.06em;
       margin-bottom: 14px;
     }
 
     .install-step h3 {
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 700;
       margin-bottom: 8px;
+      letter-spacing: -0.02em;
     }
 
     .install-step p {
       font-size: 0.85rem;
-      color: var(--text-secondary);
+      color: var(--muted);
       margin-bottom: 14px;
     }
 
     .install-step code {
       display: block;
-      background: var(--code-bg);
+      background: rgba(245, 247, 249, 0.9);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
       font-family: var(--font-mono);
-      font-size: 0.8rem;
-      color: var(--text-primary);
+      font-size: 0.82rem;
+      color: var(--text);
       overflow-x: auto;
+      line-height: 1.7;
     }
 
     .prereq-list {
@@ -492,19 +607,22 @@
     }
 
     .prereq-list li {
-      font-size: 0.8rem;
-      padding: 4px 12px;
-      background: var(--bg-secondary);
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 6px 14px;
+      background: rgba(255, 255, 255, 0.86);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text-secondary);
+      border-radius: 999px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
     }
 
     /* ── Footer ──────────────────────────────────── */
     footer {
       padding: 48px 0;
       text-align: center;
-      border-top: 1px solid var(--border);
     }
 
     .footer-links {
@@ -517,14 +635,16 @@
 
     .footer-links a {
       font-size: 0.85rem;
-      color: var(--text-secondary);
+      color: var(--muted);
     }
 
-    .footer-links a:hover { color: var(--text-primary); }
+    .footer-links a:hover { color: var(--text); }
 
     .footer-copy {
-      font-size: 0.8rem;
-      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
     }
 
     /* ── Responsive ──────────────────────────────── */
@@ -539,7 +659,9 @@
         top: 60px;
         left: 0;
         right: 0;
-        background: var(--bg-primary);
+        background: rgba(247, 248, 251, 0.95);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
         border-bottom: 1px solid var(--border);
         padding: 16px 24px;
         gap: 16px;
@@ -547,7 +669,7 @@
 
       .hero { padding: 120px 0 60px; }
       .hero h1 { font-size: 2.5rem; }
-      .hero-tagline { font-size: 1.05rem; }
+      .hero-tagline { font-size: 1rem; }
 
       .features-grid { grid-template-columns: 1fr; }
       .security-grid { grid-template-columns: 1fr; }
@@ -591,10 +713,12 @@
 <!-- Hero -->
 <header class="hero">
   <div class="container">
-    <img src="app-icon.png" alt="sigyn" class="hero-icon">
+    <div class="hero-icon-wrap">
+      <img src="app-icon.png" alt="sigyn">
+    </div>
     <h1>sigyn</h1>
     <p class="hero-tagline">Encrypted environment manager for macOS.<br>Keep secrets safe. Launch processes clean.</p>
-    <span class="hero-stage">Early Access</span>
+    <span class="hero-stage">Apache 2 OSS</span>
     <div class="hero-actions">
       <a href="https://github.com/connorguy/sigyn" class="btn btn-primary">
         <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
@@ -614,32 +738,32 @@
 
     <div class="features-grid">
       <div class="feature-card">
-        <span class="feature-icon">&#x1f512;</span>
+        <div class="feature-icon">&#x1f512;</div>
         <h3>AES-256-GCM-SIV</h3>
         <p>Secret values are encrypted at rest with nonce-misuse-resistant authenticated encryption. The master key never leaves macOS Keychain.</p>
       </div>
       <div class="feature-card">
-        <span class="feature-icon">&#x1f91a;</span>
+        <div class="feature-icon">&#x1f91a;</div>
         <h3>Touch ID Authentication</h3>
         <p>Unlock with Touch ID or device password via macOS LocalAuthentication. No app-managed passwords to remember or rotate.</p>
       </div>
       <div class="feature-card">
-        <span class="feature-icon">&#x1f4c1;</span>
+        <div class="feature-icon">&#x1f4c1;</div>
         <h3>No .env Files</h3>
         <p>Environment variables are injected directly into child processes via Rust's Command API. Nothing is written to disk in plaintext.</p>
       </div>
       <div class="feature-card">
-        <span class="feature-icon">&#x2328;&#xfe0f;</span>
+        <div class="feature-icon">&#x2328;&#xfe0f;</div>
         <h3>CLI Companion</h3>
         <p>List projects, preview effective environments, and launch processes with injected secrets from the terminal.</p>
       </div>
       <div class="feature-card">
-        <span class="feature-icon">&#x1f3af;</span>
+        <div class="feature-icon">&#x1f3af;</div>
         <h3>Multi-Environment</h3>
         <p>Define local, dev, staging, and prod environments per project. Mix presets with per-entry overrides for flexibility.</p>
       </div>
       <div class="feature-card">
-        <span class="feature-icon">&#x1f4bb;</span>
+        <div class="feature-icon">&#x1f4bb;</div>
         <h3>Local-First &amp; Native</h3>
         <p>Built with Tauri 2 and Rust. Data stays on your machine. No accounts, no cloud, no telemetry.</p>
       </div>
@@ -679,11 +803,11 @@
           <table class="encryption-table">
             <thead><tr><th>Data</th><th>Encrypted</th></tr></thead>
             <tbody>
-              <tr><td>Entry values (secrets)</td><td><span class="badge-yes">YES</span></td></tr>
-              <tr><td>Project names</td><td><span class="badge-no">NO</span></td></tr>
-              <tr><td>Entry names (keys)</td><td><span class="badge-no">NO</span></td></tr>
-              <tr><td>Environment labels</td><td><span class="badge-no">NO</span></td></tr>
-              <tr><td>Categories / descriptions</td><td><span class="badge-no">NO</span></td></tr>
+              <tr><td>Entry values (secrets)</td><td><span class="badge-yes">Yes</span></td></tr>
+              <tr><td>Project names</td><td><span class="badge-no">No</span></td></tr>
+              <tr><td>Entry names (keys)</td><td><span class="badge-no">No</span></td></tr>
+              <tr><td>Environment labels</td><td><span class="badge-no">No</span></td></tr>
+              <tr><td>Categories / descriptions</td><td><span class="badge-no">No</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -726,7 +850,7 @@
 
     <div class="cli-note">
       <span class="cli-note-icon">&#x26a0;&#xfe0f;</span>
-      <span>The CLI refuses to inject dangerous env vars like <code style="font-family: var(--font-mono); font-size: 0.8rem; background: var(--code-bg); padding: 2px 6px; border-radius: 4px;">PATH</code>, <code style="font-family: var(--font-mono); font-size: 0.8rem; background: var(--code-bg); padding: 2px 6px; border-radius: 4px;">LD_*</code>, <code style="font-family: var(--font-mono); font-size: 0.8rem; background: var(--code-bg); padding: 2px 6px; border-radius: 4px;">DYLD_*</code>, <code style="font-family: var(--font-mono); font-size: 0.8rem; background: var(--code-bg); padding: 2px 6px; border-radius: 4px;">NODE_OPTIONS</code>, and other process-loading variables for safety.</span>
+      <span>The CLI refuses to inject dangerous env vars like <code>PATH</code>, <code>LD_*</code>, <code>DYLD_*</code>, <code>NODE_OPTIONS</code>, and other process-loading variables for safety.</span>
     </div>
   </div>
 </section>
@@ -740,7 +864,7 @@
 
     <div class="install-steps">
       <div class="install-step">
-        <div class="step-number">1</div>
+        <div class="step-number">01</div>
         <h3>Prerequisites</h3>
         <p>Make sure you have these installed:</p>
         <ul class="prereq-list">
@@ -751,19 +875,19 @@
         </ul>
       </div>
       <div class="install-step">
-        <div class="step-number">2</div>
+        <div class="step-number">02</div>
         <h3>Clone &amp; Install</h3>
         <p>Clone the repository and run the install script:</p>
         <code>git clone https://github.com/connorguy/sigyn.git<br>cd sigyn<br>./install.sh</code>
       </div>
       <div class="install-step">
-        <div class="step-number">3</div>
+        <div class="step-number">03</div>
         <h3>Launch</h3>
         <p>Open the desktop app from /Applications or Spotlight, then unlock with Touch ID.</p>
         <code>sigyn --help</code>
       </div>
       <div class="install-step">
-        <div class="step-number">4</div>
+        <div class="step-number">04</div>
         <h3>Quick Start</h3>
         <p>Create a project, add environments and entries, then preview or run with the CLI.</p>
         <code>sigyn run --project "my-app" -- npm start</code>
