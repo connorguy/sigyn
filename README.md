@@ -178,11 +178,8 @@ See `SECURITY.md` for the full threat model and implementation details.
 
 ## Documentation
 
-- `CONTRIBUTING.md`
 - `docs/architecture.md`
 - `SECURITY.md`
-- `CHANGELOG.md`
-- `SUPPORT.md`
 
 ## Project Layout
 
@@ -191,11 +188,3 @@ See `SECURITY.md` for the full threat model and implementation details.
 - `src-tauri/src/`: Rust runtime, CLI, auth, IPC, and store logic
 - `docs/`: project documentation
 - `install.sh`: source install workflow
-
-## Contributing
-
-See `CONTRIBUTING.md` for local setup, checks, and contribution expectations.
-
-## Support
-
-See `SUPPORT.md` for usage questions, bug reports, and security-reporting guidance.
