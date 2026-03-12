@@ -182,7 +182,7 @@ if [[ -d "$INSTALLED_APP" ]] && [[ -L "$CLI_LINK" ]]; then
   echo "  Example CLI usage:"
   echo "    sigyn list"
   echo "    sigyn preview"
-  echo "    sigyn run -- uv run python -m your_module"
+  echo "    sigyn uv run python -m your_module"
   echo ""
 else
   fail "Installation verification failed."
