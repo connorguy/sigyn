@@ -134,11 +134,23 @@ The bundled CLI binary is included inside the built app bundle at:
 
 - `build/tauri-target/release/bundle/macos/sigyn.app/Contents/MacOS/sigyn`
 
+Omit `--project` to use the project selected in the desktop app.
+
 Examples:
 
 ```sh
 sigyn list
 ```
+
+```sh
+sigyn preview
+```
+
+```sh
+sigyn uv run python -m retail_service
+```
+
+With explicit project:
 
 ```sh
 sigyn preview --project "retail-service"

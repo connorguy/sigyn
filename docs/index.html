@@ -1448,7 +1448,7 @@
   <div class="container">
     <div class="section-label">CLI</div>
     <h2 class="section-title">GUI optional, terminal encouraged</h2>
-    <p class="section-desc">The bundled CLI does its own Touch ID check, reads the same encrypted store as the desktop app, and pipes env vars into your process. No shell eval, no intermediate files, no drama.</p>
+    <p class="section-desc">The bundled CLI does its own Touch ID check, reads the same encrypted store as the desktop app, and pipes env vars into your process. Omit <code>--project</code> to use the project selected in the desktop app. No shell eval, no intermediate files, no drama.</p>
 
     <div class="cli-examples">
       <div class="cli-example">
@@ -1456,11 +1456,15 @@
         <pre><span class="prompt">$</span> sigyn list</pre>
       </div>
       <div class="cli-example">
-        <div class="cli-example-header">Preview environment</div>
-        <pre><span class="prompt">$</span> sigyn preview <span class="flag">--project</span> <span class="string">"big-service"</span></pre>
+        <div class="cli-example-header">Preview (selected project)</div>
+        <pre><span class="prompt">$</span> sigyn preview</pre>
       </div>
       <div class="cli-example">
-        <div class="cli-example-header">Run with injected env</div>
+        <div class="cli-example-header">Run process (selected project)</div>
+        <pre><span class="prompt">$</span> sigyn uv run python -m retail_service</pre>
+      </div>
+      <div class="cli-example">
+        <div class="cli-example-header">With explicit project</div>
         <pre><span class="prompt">$</span> sigyn run <span class="flag">--project</span> <span class="string">"big-service"</span> <span class="flag">--</span> uv run python -m retail_service</pre>
       </div>
       <div class="cli-example">
@@ -1510,8 +1514,8 @@
       <div class="install-step">
         <div class="step-number">04</div>
         <h3>Quick Start</h3>
-        <p>Create a project, throw in some secrets, and let sigyn handle the rest.</p>
-        <code>sigyn run --project "my-app" -- npm start</code>
+        <p>Create a project, throw in some secrets, select it in the app, then run:</p>
+        <code>sigyn npm start</code>
       </div>
     </div>
   </div>
