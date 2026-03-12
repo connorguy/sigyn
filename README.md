@@ -21,7 +21,7 @@ flowchart LR
 - multiple saved projects
 - project-specific supported environments such as `local`, `dev`, `staging`, and `prod`
 - per-entry values by environment
-- mixed presets through per-entry overrides
+- mixed presets through per-entry overrides (base env + per-entry overrides from other envs)
 - preview and clipboard export of the effective env
 - CLI execution with injected environment variables
 - macOS device authentication before secret access
@@ -126,7 +126,8 @@ cargo check --manifest-path src-tauri/Cargo.toml
 5. Add entries such as `DATABASE_URL`, `API_TOKEN`, and `REDIS_URL`.
 6. Fill values per environment.
 7. Choose a base environment.
-8. Preview or copy the effective env.
+8. Optionally override individual entries to pull values from other envs (e.g. base `local` with `DATABASE_URL` from `staging`).
+9. Preview or copy the effective env. When you run `sigyn run` or `sigyn preview`, the injected env reflects this mix.
 
 ## CLI
 
@@ -159,6 +160,8 @@ sigyn preview --project "retail-service"
 ```sh
 sigyn run --project "retail-service" -- uv run python -m retail_service
 ```
+
+**Mix and match envs:** You can use a base environment (e.g. `local`) and override specific entries to pull values from other envs (e.g. `DATABASE_URL` from `staging`). The app and CLI both use this effective mix when previewing or running commands.
 
 Behavior:
 
