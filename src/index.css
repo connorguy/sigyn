@@ -36,11 +36,12 @@
   --shadow-card:
     0 1px 0 rgba(255, 255, 255, 0.8),
     0 14px 28px rgba(28, 34, 43, 0.08);
-  --radius-base: 18px;
-  --radius-xl: 32px;
-  --radius-lg: 24px;
-  --radius-md: 20px;
-  --radius-sm: 14px;
+  --radius-base: 17px;
+  --radius-xl: 30px;
+  --radius-lg: 22px;
+  --radius-md: 18px;
+  --radius-sm: 13px;
+  --radius-pill: 24px;
   --font-sans:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono:
@@ -195,7 +196,7 @@ p {
   height: 44px;
   padding: 0.55rem;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: var(--shadow-card);
 }
@@ -235,7 +236,7 @@ p {
   font-size: 0.9rem;
   padding: 1rem;
   border: 1px dashed var(--sidebar-border);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.45);
 }
 
@@ -243,6 +244,12 @@ p {
   margin-top: auto;
   padding-top: 1rem;
   border-top: 1px solid var(--sidebar-border);
+}
+
+.sidebar__footer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
 .workspace {
@@ -320,6 +327,14 @@ p {
   justify-content: space-between;
 }
 
+.toolbar__search-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .toolbar__actions {
   display: flex;
   gap: 0.5rem;
@@ -335,7 +350,7 @@ p {
   width: min(520px, 100%);
   background: rgba(255, 255, 255, 0.84);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.28rem 1rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
@@ -347,13 +362,17 @@ p {
   box-shadow: none;
 }
 
+.toolbar__search-group .search {
+  flex: 1 1 auto;
+}
+
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   padding: 0.78rem 1.05rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -404,7 +423,7 @@ p {
   justify-content: center;
   width: 2.25rem;
   height: 2.25rem;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid var(--border);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
@@ -419,7 +438,7 @@ p {
   width: 100%;
   text-align: left;
   padding: 0.85rem 0.95rem;
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.76);
   border: 1px solid var(--sidebar-border);
   color: inherit;
@@ -456,7 +475,7 @@ p {
 .project-link__count {
   min-width: 1.85rem;
   padding: 0.18rem 0.45rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(29, 35, 44, 0.06);
   color: var(--muted);
   font-family: var(--font-mono);
@@ -522,14 +541,14 @@ p {
   place-items: center;
   width: 88px;
   height: 88px;
-  border-radius: 28px;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: var(--shadow-card);
 }
 
 .lock-split__brand-icon img {
-  border-radius: 18px;
+  border-radius: var(--radius-base);
 }
 
 .lock-split__brand-name {
@@ -643,7 +662,7 @@ p {
   align-items: center;
   gap: 0.4rem;
   padding: 0.45rem 0.75rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.86);
   border: 1px solid var(--border);
   color: var(--muted);
@@ -665,7 +684,7 @@ p {
   gap: 0.75rem;
   padding: 1rem 1.1rem;
   border: 1px solid var(--border);
-  border-radius: 28px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.84);
   box-shadow: var(--shadow-card);
 }
@@ -694,7 +713,7 @@ p {
   align-items: center;
   gap: 0.45rem;
   padding: 0.5rem 0.9rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--surface);
   font-family: var(--font-mono);
@@ -784,7 +803,7 @@ p {
   display: inline-flex;
   align-items: center;
   padding: 0.3rem 0.65rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.76rem;
   font-weight: 600;
   background: var(--accent-soft);
@@ -801,51 +820,68 @@ p {
   border-color: var(--warning-border);
 }
 
-.cli-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  border: 1px solid var(--border);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.84);
-  padding: 1rem 1.1rem;
-  box-shadow: var(--shadow-card);
-}
-
-.cli-card__toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0;
-  text-align: left;
-}
-
-.cli-card__title {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.cli-card__toggle-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
+.alert-badge {
+  position: relative;
   flex-shrink: 0;
 }
 
-.cli-card__content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
+.alert-badge__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-height: 2.6rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--warning-border);
+  background: var(--warning-soft);
+  color: var(--warning-strong);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  box-shadow: var(--shadow-card);
+  cursor: help;
+}
+
+.alert-badge__pill:hover,
+.alert-badge__pill:focus-visible {
+  border-color: rgba(239, 156, 50, 0.38);
+}
+
+.alert-badge__tooltip {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  left: 0;
+  width: min(320px, calc(100vw - 5rem));
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-base);
+  border: 1px solid var(--warning-border);
+  background: rgba(252, 253, 254, 0.98);
+  color: var(--warning-strong);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  box-shadow: var(--shadow-card);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease,
+    visibility 120ms ease;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.alert-badge:focus-within .alert-badge__tooltip,
+.alert-badge:hover .alert-badge__tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 .cli-setup-details {
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background: var(--surface-strong);
 }
 
@@ -905,7 +941,7 @@ details[open] > .cli-setup-summary::before {
   font-size: 0.92rem;
   background: rgba(245, 247, 249, 0.9);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-md);
   padding: 0.9rem 1rem;
 }
 
@@ -914,7 +950,7 @@ details[open] > .cli-setup-summary::before {
   align-items: center;
   gap: 0.65rem;
   padding: 0.85rem 1rem;
-  border-radius: 20px;
+  border-radius: var(--radius-md);
   border: 1px solid;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
@@ -946,7 +982,7 @@ details[open] > .cli-setup-summary::before {
 
 .entry-card {
   border: 1px solid var(--border);
-  border-radius: 28px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.92);
   overflow: hidden;
   box-shadow: var(--shadow-card);
@@ -968,7 +1004,7 @@ details[open] > .cli-setup-summary::before {
   min-width: 2.45rem;
   height: 2rem;
   padding: 0 0.45rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--muted);
@@ -1010,7 +1046,7 @@ details[open] > .cli-setup-summary::before {
 }
 
 .entry-card__select select {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--panel);
   font-family: var(--font-mono);
   font-size: 0.76rem;
@@ -1026,7 +1062,7 @@ details[open] > .cli-setup-summary::before {
   color: var(--muted);
   font-size: 0.82rem;
   padding: 0.72rem 0.9rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(245, 247, 249, 0.92);
   border: 1px dashed var(--border);
 }
@@ -1163,7 +1199,7 @@ details[open] > .cli-setup-summary::before {
 
 .empty-state {
   border: 1px dashed var(--border);
-  border-radius: 28px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.6);
   padding: 2rem;
   display: flex;
@@ -1244,7 +1280,7 @@ details[open] > .cli-setup-summary::before {
   max-height: 220px;
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   padding: 0.8rem 0.9rem;
   background: rgba(245, 247, 249, 0.88);
 }
@@ -1269,7 +1305,7 @@ details[open] > .cli-setup-summary::before {
   gap: 0.75rem;
   padding: 0.72rem 0.82rem;
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.88);
   transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
@@ -1311,7 +1347,7 @@ details[open] > .cli-setup-summary::before {
   display: inline-flex;
   align-items: center;
   padding: 0.32rem 0.7rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent-soft-strong);
   color: var(--accent);
   font-family: var(--font-mono);
@@ -1326,7 +1362,7 @@ details[open] > .cli-setup-summary::before {
   flex: 1;
   min-width: 0;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(245, 247, 249, 0.9);
   color: var(--text);
   font-family: var(--font-mono);
@@ -1397,6 +1433,10 @@ details[open] > .cli-setup-summary::before {
   .header-actions {
     justify-content: flex-start;
   }
+
+  .toolbar__search-group {
+    width: 100%;
+  }
 }
 
 /* import dialog */
@@ -1430,7 +1470,7 @@ details[open] > .cli-setup-summary::before {
 
 .import-preview {
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   background: rgba(255, 255, 255, 0.86);
 }
@@ -1472,7 +1512,7 @@ details[open] > .cli-setup-summary::before {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 0.2rem 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .import-preview__badge--new {
