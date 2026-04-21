@@ -589,12 +589,13 @@ impl Store {
     }
 
     pub fn preview_project(&self, project_id: &str, key: &[u8]) -> Result<PreviewResult, AppError> {
-        Ok(self.resolve_preview(project_id, key)?.into_public())
+        Ok(self.resolve_preview(project_id, None, key)?.into_public())
     }
 
     pub fn preview_project_by_name(
         &self,
         project_name: &str,
+        environment: Option<&str>,
         key: &[u8],
     ) -> Result<(Option<String>, String, Vec<(String, String)>), AppError> {
         let conn = self.connection()?;
@@ -609,7 +610,7 @@ impl Store {
 
         let ResolvedPreview {
             serialized, items, ..
-        } = self.resolve_preview(&project_id, key)?;
+        } = self.resolve_preview(&project_id, environment, key)?;
         let env_vars = items
             .into_iter()
             .map(|item| (item.entry_name, item.value))
@@ -619,6 +620,7 @@ impl Store {
 
     pub fn preview_active_project(
         &self,
+        environment: Option<&str>,
         key: &[u8],
     ) -> Result<(String, Option<String>, String, Vec<(String, String)>), AppError> {
         let conn = self.connection()?;
@@ -647,7 +649,7 @@ impl Store {
 
         let ResolvedPreview {
             serialized, items, ..
-        } = self.resolve_preview(&project_id, key)?;
+        } = self.resolve_preview(&project_id, environment, key)?;
         let env_vars = items
             .into_iter()
             .map(|item| (item.entry_name, item.value))
@@ -682,17 +684,34 @@ impl Store {
         })
     }
 
-    fn resolve_preview(&self, project_id: &str, key: &[u8]) -> Result<ResolvedPreview, AppError> {
+    fn resolve_preview(
+        &self,
+        project_id: &str,
+        environment: Option<&str>,
+        key: &[u8],
+    ) -> Result<ResolvedPreview, AppError> {
         let conn = self.connection()?;
 
-        let (name, base_environment) = conn
+        let (name, saved_base_environment, supported_environments) = conn
             .query_row(
-                "SELECT name, base_environment FROM projects WHERE id = ?1",
+                "SELECT name, base_environment, supported_environments FROM projects WHERE id = ?1",
                 params![project_id],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                },
             )
             .optional()?
             .ok_or_else(|| AppError::NotFound("project not found".into()))?;
+        let supported_environments: Vec<String> = serde_json::from_str(&supported_environments)?;
+        let base_environment = resolve_preview_base_environment(
+            &saved_base_environment,
+            &supported_environments,
+            environment,
+        )?;
 
         let entry_overrides = self.load_entry_overrides(&conn, project_id)?;
 
@@ -1047,6 +1066,25 @@ fn normalize_environment_name(value: &str) -> Result<String, AppError> {
     Ok(normalized)
 }
 
+fn resolve_preview_base_environment(
+    saved_base_environment: &str,
+    supported_environments: &[String],
+    selected_environment: Option<&str>,
+) -> Result<String, AppError> {
+    match selected_environment {
+        Some(value) => {
+            let environment = normalize_environment_name(value)?;
+            if !supported_environments.contains(&environment) {
+                return Err(AppError::Validation(format!(
+                    "environment `{environment}` is not supported by this project"
+                )));
+            }
+            Ok(environment)
+        }
+        None => Ok(saved_base_environment.to_string()),
+    }
+}
+
 fn normalize_supported_environments(values: Vec<String>) -> Result<Vec<String>, AppError> {
     let mut seen = BTreeSet::new();
     let mut normalized = Vec::new();
@@ -1103,6 +1141,38 @@ fn normalize_optional_text(value: Option<String>) -> Option<String> {
             Some(trimmed.to_string())
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_preview_base_environment;
+
+    #[test]
+    fn preview_base_environment_defaults_to_saved_value() {
+        let supported = vec!["local".to_string(), "staging".to_string()];
+        let resolved =
+            resolve_preview_base_environment("local", &supported, None).expect("saved env should resolve");
+        assert_eq!(resolved, "local");
+    }
+
+    #[test]
+    fn preview_base_environment_normalizes_cli_override() {
+        let supported = vec!["local".to_string(), "staging-env".to_string()];
+        let resolved = resolve_preview_base_environment("local", &supported, Some(" Staging Env "))
+            .expect("cli env should normalize");
+        assert_eq!(resolved, "staging-env");
+    }
+
+    #[test]
+    fn preview_base_environment_rejects_unsupported_cli_override() {
+        let supported = vec!["local".to_string(), "staging".to_string()];
+        let error = resolve_preview_base_environment("local", &supported, Some("prod"))
+            .expect_err("unsupported env should fail");
+        assert_eq!(
+            error.to_string(),
+            "environment `prod` is not supported by this project"
+        );
+    }
 }
 
 fn encrypt_value(key: &[u8], plaintext: &str) -> Result<String, AppError> {

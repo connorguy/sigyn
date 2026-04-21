@@ -135,7 +135,7 @@ The bundled CLI binary is included inside the built app bundle at:
 
 - `build/tauri-target/release/bundle/macos/sigyn.app/Contents/MacOS/sigyn`
 
-Omit `--project` to use the project selected in the desktop app.
+Omit `--project` to use the project selected in the desktop app. Pass `--env` to temporarily use a different base environment for that invocation; saved per-entry overrides still apply.
 
 Examples:
 
@@ -159,6 +159,16 @@ sigyn preview --project "retail-service"
 
 ```sh
 sigyn run --project "retail-service" -- uv run python -m retail_service
+```
+
+With explicit project and base environment:
+
+```sh
+sigyn preview --project "retail-service" --env staging
+```
+
+```sh
+sigyn run --project "retail-service" --env staging -- uv run python -m retail_service
 ```
 
 **Mix and match envs:** You can use a base environment (e.g. `local`) and override specific entries to pull values from other envs (e.g. `DATABASE_URL` from `staging`). The app and CLI both use this effective mix when previewing or running commands.

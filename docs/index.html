@@ -1448,7 +1448,7 @@
   <div class="container">
     <div class="section-label">CLI</div>
     <h2 class="section-title">GUI optional, terminal encouraged</h2>
-    <p class="section-desc">The bundled CLI does its own Touch ID check, reads the same encrypted store as the desktop app, and pipes env vars into your process. Omit <code>--project</code> to use the project selected in the desktop app. You can mix and match envs: choose a base (e.g. <code>local</code>) and override individual entries to pull from other envs (e.g. <code>DATABASE_URL</code> from <code>staging</code>). Both <code>sigyn preview</code> and <code>sigyn run</code> use this effective mix. No shell eval, no intermediate files, no drama.</p>
+    <p class="section-desc">The bundled CLI does its own Touch ID check, reads the same encrypted store as the desktop app, and pipes env vars into your process. Omit <code>--project</code> to use the project selected in the desktop app. Pass <code>--env</code> to temporarily use a different base environment for that invocation; saved per-entry overrides still apply. You can mix and match envs: choose a base (e.g. <code>local</code>) and override individual entries to pull from other envs (e.g. <code>DATABASE_URL</code> from <code>staging</code>). Both <code>sigyn preview</code> and <code>sigyn run</code> use this effective mix. No shell eval, no intermediate files, no drama.</p>
 
     <div class="cli-examples">
       <div class="cli-example">
@@ -1466,6 +1466,10 @@
       <div class="cli-example">
         <div class="cli-example-header">With explicit project</div>
         <pre><span class="prompt">$</span> sigyn run <span class="flag">--project</span> <span class="string">"big-service"</span> <span class="flag">--</span> uv run python -m retail_service</pre>
+      </div>
+      <div class="cli-example">
+        <div class="cli-example-header">With explicit project and env</div>
+        <pre><span class="prompt">$</span> sigyn run <span class="flag">--project</span> <span class="string">"big-service"</span> <span class="flag">--env</span> staging <span class="flag">--</span> uv run python -m retail_service</pre>
       </div>
       <div class="cli-example">
         <div class="cli-example-header">Reset (development only)</div>
