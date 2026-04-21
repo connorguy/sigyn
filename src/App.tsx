@@ -101,7 +101,7 @@ export default function App() {
   const [showEditProject, setShowEditProject] = useState(false)
   const [showAddEntry, setShowAddEntry] = useState(false)
   const [showImportEntries, setShowImportEntries] = useState(false)
-  const [isCliPanelExpanded, setIsCliPanelExpanded] = useState(false)
+  const [showCliDialog, setShowCliDialog] = useState(false)
   const [isRenamingProject, setIsRenamingProject] = useState(false)
   const [projectNameDraft, setProjectNameDraft] = useState("")
   const [entryDeleteTarget, setEntryDeleteTarget] = useState<EntryDeleteTarget | null>(null)
@@ -166,6 +166,11 @@ export default function App() {
     () => (activeProject ? getMissingEntries(activeProject) : []),
     [activeProject],
   )
+  const missingEntriesMessage = activeProject
+    ? `${missingEntries.length} entr${
+        missingEntries.length === 1 ? "y is" : "ies are"
+      } missing a value for the current effective selection and will be skipped.`
+    : null
 
   const filteredEntries = useMemo(() => {
     if (!activeProject) {
@@ -285,6 +290,7 @@ export default function App() {
   function resetTransientUi() {
     setPreview(null)
     setSearchQuery("")
+    setShowCliDialog(false)
     setIsRenamingProject(false)
     setShowAddEntry(false)
     setShowImportEntries(false)
@@ -543,6 +549,8 @@ export default function App() {
           projects={snapshot.projects}
           activeProjectId={activeProject?.id ?? null}
           onSelectProject={(projectId) => void applySnapshotAction(selectProject(projectId))}
+          showCliButton={Boolean(activeProject)}
+          onShowCliDialog={() => setShowCliDialog(true)}
           onAddProject={() => setShowAddProject(true)}
         />
 
@@ -662,51 +670,20 @@ export default function App() {
                   }
                 />
 
-                <section className="cli-card">
-                  <button
-                    type="button"
-                    className="cli-card__toggle"
-                    onClick={() => setIsCliPanelExpanded((current) => !current)}
-                    aria-expanded={isCliPanelExpanded}
-                    aria-controls="companion-cli-panel"
-                  >
-                    <div className="cli-card__title">
-                      <Terminal size={16} />
-                      Companion CLI
-                    </div>
-                    <div className="cli-card__toggle-meta">
-                      <span className="muted muted--small">
-                        {isCliPanelExpanded ? "Hide usage" : "Show usage"}
-                      </span>
-                      {isCliPanelExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </div>
-                  </button>
-
-                  {isCliPanelExpanded ? (
-                    <div id="companion-cli-panel" className="cli-card__content">
-                      <p className="muted muted--small">
-                        The install script puts <code>sigyn</code> on your PATH. It authenticates
-                        locally, reads the encrypted store directly, and injects the resolved env
-                        into the child command.
-                      </p>
-
-                      <p className="muted muted--small cli-usage-label">Usage</p>
-                      <code className="code-block">
-                        {`# uses the active project (${activeProject.name})\nsigyn uv run python -m your_module\n\n# target a specific project\nsigyn run --project ${shellQuote(activeProject.name)} -- uv run python -m your_module`}
-                      </code>
-                    </div>
-                  ) : null}
-                </section>
-
                 <div className="toolbar">
-                  <label className="search">
-                    <Search size={16} />
-                    <input
-                      value={searchQuery}
-                      placeholder="Search entries..."
-                      onChange={(event) => setSearchQuery(event.target.value)}
-                    />
-                  </label>
+                  <div className="toolbar__search-group">
+                    <label className="search">
+                      <Search size={16} />
+                      <input
+                        value={searchQuery}
+                        placeholder="Search entries..."
+                        onChange={(event) => setSearchQuery(event.target.value)}
+                      />
+                    </label>
+                    {missingEntries.length > 0 && missingEntriesMessage ? (
+                      <AlertBadge count={missingEntries.length} message={missingEntriesMessage} />
+                    ) : null}
+                  </div>
                   <div className="toolbar__actions">
                     <button
                       className="button button--ghost"
@@ -743,15 +720,6 @@ export default function App() {
 
             {error ? <Banner tone="danger" message={error} /> : null}
             {notice ? <Banner tone={notice.tone} message={notice.message} /> : null}
-
-            {activeProject && missingEntries.length > 0 ? (
-              <Banner
-                tone="warning"
-                message={`${missingEntries.length} entr${
-                  missingEntries.length === 1 ? "y is" : "ies are"
-                } missing a value for the current effective selection and will be skipped.`}
-              />
-            ) : null}
           </header>
 
           <section className="workspace__content">
@@ -826,6 +794,12 @@ export default function App() {
             working_directory: values.workingDirectory || null,
           })
         }
+      />
+
+      <CliDialog
+        open={showCliDialog && Boolean(activeProject)}
+        project={activeProject}
+        onClose={() => setShowCliDialog(false)}
       />
 
       <ProjectDialog
@@ -913,11 +887,15 @@ function ProjectSidebar({
   projects,
   activeProjectId,
   onSelectProject,
+  showCliButton,
+  onShowCliDialog,
   onAddProject,
 }: {
   projects: ProjectRecord[]
   activeProjectId: string | null
   onSelectProject: (projectId: string) => void
+  showCliButton: boolean
+  onShowCliDialog: () => void
   onAddProject: () => void
 }) {
   return (
@@ -947,12 +925,53 @@ function ProjectSidebar({
       </nav>
 
       <div className="sidebar__footer">
-        <button className="button button--ghost button--full" onClick={onAddProject}>
-          <Plus size={16} />
-          Add Project
-        </button>
+        <div className="sidebar__footer-actions">
+          {showCliButton ? (
+            <button className="button button--ghost button--full" onClick={onShowCliDialog}>
+              <Terminal size={16} />
+              Companion CLI
+            </button>
+          ) : null}
+          <button className="button button--ghost button--full" onClick={onAddProject}>
+            <Plus size={16} />
+            Add Project
+          </button>
+        </div>
       </div>
     </aside>
+  )
+}
+
+function CliDialog({
+  open,
+  project,
+  onClose,
+}: {
+  open: boolean
+  project: ProjectRecord | null
+  onClose: () => void
+}) {
+  if (!open || !project) {
+    return null
+  }
+
+  return (
+    <Modal
+      title="Companion CLI"
+      subtitle="Run commands with the active project's resolved environment already injected."
+      onClose={onClose}
+    >
+      <p className="muted muted--small">
+        The install script puts <code>sigyn</code> on your PATH. It authenticates locally,
+        reads the encrypted store directly, and injects the resolved env into the child
+        command.
+      </p>
+
+      <p className="muted muted--small cli-usage-label">Usage</p>
+      <code className="code-block">
+        {`# uses the active project (${project.name})\nsigyn uv run python -m your_module\n\n# target a specific project\nsigyn run --project ${shellQuote(project.name)} -- uv run python -m your_module`}
+      </code>
+    </Modal>
   )
 }
 
@@ -2030,6 +2049,31 @@ function Banner({
       {tone === "success" ? <Check size={16} /> : null}
       {tone === "danger" ? <X size={16} /> : null}
       <span>{message}</span>
+    </div>
+  )
+}
+
+function AlertBadge({
+  count,
+  message,
+}: {
+  count: number
+  message: string
+}) {
+  return (
+    <div className="alert-badge">
+      <button
+        type="button"
+        className="alert-badge__pill"
+        aria-label={message}
+        aria-describedby="missing-entries-tooltip"
+      >
+        <AlertTriangle size={14} />
+        <span>{count}</span>
+      </button>
+      <div id="missing-entries-tooltip" role="tooltip" className="alert-badge__tooltip">
+        {message}
+      </div>
     </div>
   )
 }

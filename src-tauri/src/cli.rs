@@ -21,6 +21,10 @@ pub struct Cli {
     #[arg(long, global = true)]
     project: Option<String>,
 
+    /// Base environment for this invocation (saved entry overrides still apply)
+    #[arg(long, global = true)]
+    env: Option<String>,
+
     /// Working directory for the child command
     #[arg(long)]
     cwd: Option<PathBuf>,
@@ -69,12 +73,12 @@ pub fn run_cli() -> Result<(), AppError> {
     match cli.command {
         Some(Commands::List) => list_projects(),
         Some(Commands::Preview) => {
-            let resolved = resolve_env(cli.project)?;
+            let resolved = resolve_env(cli.project, cli.env)?;
             println!("{}", resolved.serialized);
             Ok(())
         }
         Some(Commands::Run { cwd, command }) => {
-            run_command(cli.project, cwd, command)
+            run_command(cli.project, cli.env, cwd, command)
         }
         Some(Commands::ResetTestData { confirm }) => reset_test_data(confirm),
         None => {
@@ -82,7 +86,7 @@ pub fn run_cli() -> Result<(), AppError> {
                 Cli::parse_from(["sigyn", "--help"]);
                 Ok(())
             } else {
-                run_command(cli.project, cli.cwd, cli.command_args)
+                run_command(cli.project, cli.env, cli.cwd, cli.command_args)
             }
         }
     }
@@ -90,10 +94,11 @@ pub fn run_cli() -> Result<(), AppError> {
 
 fn run_command(
     project: Option<String>,
+    environment: Option<String>,
     cwd: Option<PathBuf>,
     command: Vec<String>,
 ) -> Result<(), AppError> {
-    let resolved = resolve_env(project)?;
+    let resolved = resolve_env(project, environment)?;
     let executable = command
         .first()
         .cloned()
@@ -146,12 +151,13 @@ fn list_projects() -> Result<(), AppError> {
     Ok(())
 }
 
-fn resolve_env(project: Option<String>) -> Result<CliResolvedEnv, AppError> {
+fn resolve_env(project: Option<String>, environment: Option<String>) -> Result<CliResolvedEnv, AppError> {
     with_local_decryption(|store, key| {
         let (working_directory, serialized, env_vars) = match project.as_deref() {
-            Some(name) => store.preview_project_by_name(name, key)?,
+            Some(name) => store.preview_project_by_name(name, environment.as_deref(), key)?,
             None => {
-                let (_, working_directory, serialized, env_vars) = store.preview_active_project(key)?;
+                let (_, working_directory, serialized, env_vars) =
+                    store.preview_active_project(environment.as_deref(), key)?;
                 (working_directory, serialized, env_vars)
             }
         };
