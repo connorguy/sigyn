@@ -10,6 +10,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  FileJson,
   Lock,
   Pencil,
   Plus,
@@ -55,7 +56,7 @@ import type {
   UpdateProjectInput,
   UpdateEntryInput,
 } from "@/lib/types"
-import { prettyJson, tryParseJson } from "@/lib/json"
+import { parseJsonImport, prettyJson, tryParseJson } from "@/lib/json"
 
 type ValueDraft = {
   present: boolean
@@ -1820,16 +1821,22 @@ function ImportDialog({
 }) {
   const [envText, setEnvText] = useState("")
   const [environment, setEnvironment] = useState("")
+  const [mode, setMode] = useState<"env" | "json">("env")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open && project) {
       setEnvText("")
       setEnvironment(project.active_base_environment)
+      setMode("env")
     }
   }, [open, project])
 
-  const parsed = useMemo(() => parseEnvText(envText), [envText])
+  const parsed = useMemo<{ items: ImportEntryItem[]; error: string | null }>(() => {
+    if (mode === "json") return parseJsonImport(envText)
+    return { items: parseEnvText(envText), error: null }
+  }, [envText, mode])
+  const canFormatJson = mode === "json" && tryParseJson(envText) !== null
 
   const existingNames = useMemo(() => {
     if (!project) return new Set<string>()
@@ -1857,7 +1864,7 @@ function ImportDialog({
   return (
     <Modal
       title="Import Entries"
-      subtitle="Paste .env content or load a file. All parsed entries will be assigned to the selected environment."
+      subtitle="Paste .env content or a JSON object. All parsed entries will be assigned to the selected environment."
       onClose={onClose}
     >
       <label>
@@ -1876,9 +1883,51 @@ function ImportDialog({
         </select>
       </label>
 
+      <div className="import-mode-toggle" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "env"}
+          className={`import-mode-toggle__button ${
+            mode === "env" ? "import-mode-toggle__button--active" : ""
+          }`}
+          disabled={busy}
+          onClick={() => setMode("env")}
+        >
+          .env
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "json"}
+          className={`import-mode-toggle__button ${
+            mode === "json" ? "import-mode-toggle__button--active" : ""
+          }`}
+          disabled={busy}
+          onClick={() => setMode("json")}
+        >
+          <FileJson size={14} />
+          JSON
+        </button>
+      </div>
+
       <div className="import-source">
         <div className="import-source__header">
-          <span>.env content</span>
+          <span>{mode === "json" ? "JSON content" : ".env content"}</span>
+          {mode === "json" && (
+            <button
+              className="button button--ghost button--sm"
+              disabled={busy || !canFormatJson}
+              onClick={() => {
+                const value = tryParseJson(envText)
+                if (value !== null) setEnvText(prettyJson(value))
+              }}
+              title="Pretty-print the pasted JSON"
+            >
+              <Braces size={14} />
+              Format
+            </button>
+          )}
           <button
             className="button button--ghost button--sm"
             disabled={busy}
@@ -1890,7 +1939,7 @@ function ImportDialog({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".env,.env.*,text/*"
+            accept={mode === "json" ? ".json,application/json" : ".env,.env.*,text/*"}
             style={{ display: "none" }}
             onChange={handleFileSelect}
           />
@@ -1899,18 +1948,28 @@ function ImportDialog({
           className="textarea textarea--import"
           value={envText}
           disabled={busy}
-          placeholder={"DATABASE_URL=postgres://localhost/mydb\nAPI_KEY=sk-abc123\nDEBUG=true"}
+          placeholder={
+            mode === "json"
+              ? '{\n  "DATABASE_URL": "postgres://localhost/mydb",\n  "API_KEY": "sk-abc123",\n  "FLAGS": { "debug": true }\n}'
+              : "DATABASE_URL=postgres://localhost/mydb\nAPI_KEY=sk-abc123\nDEBUG=true"
+          }
           onChange={(event) => setEnvText(event.target.value)}
         />
       </div>
 
-      {parsed.length > 0 && (
+      {parsed.error && (
+        <div className="import-preview import-preview--error">
+          <div className="import-preview__header">{parsed.error}</div>
+        </div>
+      )}
+
+      {parsed.items.length > 0 && (
         <div className="import-preview">
           <div className="import-preview__header">
-            {parsed.length} entr{parsed.length === 1 ? "y" : "ies"} found
+            {parsed.items.length} entr{parsed.items.length === 1 ? "y" : "ies"} found
           </div>
           <div className="import-preview__list">
-            {parsed.map((item, index) => {
+            {parsed.items.map((item, index) => {
               const normalized = item.name
                 .trim()
                 .replace(/^export\s+/i, "")
@@ -1941,11 +2000,13 @@ function ImportDialog({
         </button>
         <button
           className="button button--primary"
-          disabled={busy || parsed.length === 0}
-          onClick={() => void onImport(project.id, environment, parsed)}
+          disabled={busy || parsed.items.length === 0}
+          onClick={() => void onImport(project.id, environment, parsed.items)}
         >
           <Upload size={16} />
-          {busy ? "Importing..." : `Import ${parsed.length} entr${parsed.length === 1 ? "y" : "ies"}`}
+          {busy
+            ? "Importing..."
+            : `Import ${parsed.items.length} entr${parsed.items.length === 1 ? "y" : "ies"}`}
         </button>
       </div>
     </Modal>
