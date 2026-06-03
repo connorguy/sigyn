@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { listen } from "@tauri-apps/api/event"
 import {
   AlertTriangle,
+  Braces,
   Check,
   ChevronDown,
   ChevronRight,
@@ -54,6 +55,7 @@ import type {
   UpdateProjectInput,
   UpdateEntryInput,
 } from "@/lib/types"
+import { prettyJson, tryParseJson } from "@/lib/json"
 
 type ValueDraft = {
   present: boolean
@@ -1077,6 +1079,7 @@ function EntryCard({
   )
   const [revealed, setRevealed] = useState<Record<string, boolean>>({})
   const [valueFocused, setValueFocused] = useState<Record<string, boolean>>({})
+  const [formatted, setFormatted] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     setDraftName(entry.name)
@@ -1084,6 +1087,7 @@ function EntryCard({
     setDraftDescription(entry.description ?? "")
     setDraftValues(buildEntryDraftValues(project, entry))
     setRevealed({})
+    setFormatted({})
     setValuesLoaded(false)
   }, [entry, project])
 
@@ -1222,6 +1226,8 @@ function EntryCard({
               const isActive = selectedEnvironment === environment
               const canUseBase = environment === project.active_base_environment
               const isMasked = draft.present && !revealed[environment]
+              const parsedJson = !isMasked && draft.present ? tryParseJson(draft.value) : null
+              const showFormatted = formatted[environment] && parsedJson !== null && !isMasked
 
               return (
                 <div
@@ -1249,52 +1255,58 @@ function EntryCard({
                     )}
                   </button>
 
-                  <input
-                    className={`env-value-row__input ${
-                      isMasked ? "env-value-row__input--masked" : ""
-                    }`}
-                    type="text"
-                    autoComplete="off"
-                    disabled={saving || !valuesLoaded}
-                    readOnly={isMasked}
-                    value={
-                      isMasked
-                        ? OBSCURED_SECRET_MASK
-                        : valueFocused[environment]
-                          ? draft.value
-                          : displayWhitespace(draft.value)
-                    }
-                    placeholder={draft.present ? "" : "not set"}
-                    onFocus={() => {
-                      setValueFocused((current) => ({ ...current, [environment]: true }))
-                      if (!isMasked) {
-                        return
+                  {showFormatted ? (
+                    <pre className="env-value-row__formatted">
+                      {prettyJson(parsedJson)}
+                    </pre>
+                  ) : (
+                    <input
+                      className={`env-value-row__input ${
+                        isMasked ? "env-value-row__input--masked" : ""
+                      }`}
+                      type="text"
+                      autoComplete="off"
+                      disabled={saving || !valuesLoaded}
+                      readOnly={isMasked}
+                      value={
+                        isMasked
+                          ? OBSCURED_SECRET_MASK
+                          : valueFocused[environment]
+                            ? draft.value
+                            : displayWhitespace(draft.value)
                       }
+                      placeholder={draft.present ? "" : "not set"}
+                      onFocus={() => {
+                        setValueFocused((current) => ({ ...current, [environment]: true }))
+                        if (!isMasked) {
+                          return
+                        }
 
-                      setRevealed((current) => ({
-                        ...current,
-                        [environment]: true,
-                      }))
-                    }}
-                    onBlur={() => {
-                      setValueFocused((current) => ({ ...current, [environment]: false }))
-                    }}
-                    onChange={(event) =>
-                      {
-                        setDraftValues((current) => ({
-                          ...current,
-                          [environment]: {
-                            present: true,
-                            value: event.target.value,
-                          },
-                        }))
                         setRevealed((current) => ({
                           ...current,
                           [environment]: true,
                         }))
+                      }}
+                      onBlur={() => {
+                        setValueFocused((current) => ({ ...current, [environment]: false }))
+                      }}
+                      onChange={(event) =>
+                        {
+                          setDraftValues((current) => ({
+                            ...current,
+                            [environment]: {
+                              present: true,
+                              value: event.target.value,
+                            },
+                          }))
+                          setRevealed((current) => ({
+                            ...current,
+                            [environment]: true,
+                          }))
+                        }
                       }
-                    }
-                  />
+                    />
+                  )}
 
                   <div className="env-value-row__actions">
                     <button
@@ -1319,14 +1331,37 @@ function EntryCard({
                       <Copy size={14} />
                     </button>
                     <button
+                      className={`icon-button icon-button--sm ${
+                        showFormatted ? "icon-button--active" : ""
+                      }`}
+                      disabled={
+                        !draft.present ||
+                        saving ||
+                        !valuesLoaded ||
+                        isMasked ||
+                        parsedJson === null
+                      }
+                      onClick={() =>
+                        setFormatted((current) => ({
+                          ...current,
+                          [environment]: !current[environment],
+                        }))
+                      }
+                      aria-label={showFormatted ? "Show raw" : "Format JSON"}
+                      title={showFormatted ? "Show raw" : "Format JSON"}
+                    >
+                      <Braces size={14} />
+                    </button>
+                    <button
                       className="icon-button icon-button--sm"
                       disabled={saving || !valuesLoaded}
-                      onClick={() =>
+                      onClick={() => {
                         setDraftValues((current) => ({
                           ...current,
                           [environment]: { present: false, value: "" },
                         }))
-                      }
+                        setFormatted((current) => ({ ...current, [environment]: false }))
+                      }}
                       aria-label="Remove value"
                     >
                       <Trash2 size={14} />
@@ -1558,6 +1593,7 @@ function EntryDialog({
   const [values, setValues] = useState<Record<string, ValueDraft>>({})
   const [revealed, setRevealed] = useState<Record<string, boolean>>({})
   const [valueFocused, setValueFocused] = useState<Record<string, boolean>>({})
+  const [formatted, setFormatted] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     if (open && project) {
@@ -1574,6 +1610,7 @@ function EntryDialog({
       )
       setRevealed({})
       setValueFocused({})
+      setFormatted({})
     }
   }, [open, project])
 
@@ -1626,6 +1663,8 @@ function EntryDialog({
         {project.supported_environments.map((environment) => {
           const draft = values[environment] ?? { present: false, value: "" }
           const isMasked = draft.present && !revealed[environment]
+          const parsedJson = !isMasked && draft.present ? tryParseJson(draft.value) : null
+          const showFormatted = formatted[environment] && parsedJson !== null && !isMasked
           return (
             <div key={environment} className="env-value-row">
               <div className="env-value-row__label env-value-row__label--static">
@@ -1637,52 +1676,56 @@ function EntryDialog({
                 </span>
               </div>
 
-              <input
-                className={`env-value-row__input ${
-                  isMasked ? "env-value-row__input--masked" : ""
-                }`}
-                type="text"
-                autoComplete="off"
-                disabled={busy}
-                readOnly={isMasked}
-                value={
-                  isMasked
-                    ? OBSCURED_SECRET_MASK
-                    : valueFocused[environment]
-                      ? draft.value
-                      : displayWhitespace(draft.value)
-                }
-                placeholder="not set"
-                onFocus={() => {
-                  setValueFocused((current) => ({ ...current, [environment]: true }))
-                  if (!isMasked) {
-                    return
+              {showFormatted ? (
+                <pre className="env-value-row__formatted">{prettyJson(parsedJson)}</pre>
+              ) : (
+                <input
+                  className={`env-value-row__input ${
+                    isMasked ? "env-value-row__input--masked" : ""
+                  }`}
+                  type="text"
+                  autoComplete="off"
+                  disabled={busy}
+                  readOnly={isMasked}
+                  value={
+                    isMasked
+                      ? OBSCURED_SECRET_MASK
+                      : valueFocused[environment]
+                        ? draft.value
+                        : displayWhitespace(draft.value)
                   }
+                  placeholder="not set"
+                  onFocus={() => {
+                    setValueFocused((current) => ({ ...current, [environment]: true }))
+                    if (!isMasked) {
+                      return
+                    }
 
-                  setRevealed((current) => ({
-                    ...current,
-                    [environment]: true,
-                  }))
-                }}
-                onBlur={() => {
-                  setValueFocused((current) => ({ ...current, [environment]: false }))
-                }}
-                onChange={(event) =>
-                  {
-                    setValues((current) => ({
-                      ...current,
-                      [environment]: {
-                        present: true,
-                        value: event.target.value,
-                      },
-                    }))
                     setRevealed((current) => ({
                       ...current,
                       [environment]: true,
                     }))
+                  }}
+                  onBlur={() => {
+                    setValueFocused((current) => ({ ...current, [environment]: false }))
+                  }}
+                  onChange={(event) =>
+                    {
+                      setValues((current) => ({
+                        ...current,
+                        [environment]: {
+                          present: true,
+                          value: event.target.value,
+                        },
+                      }))
+                      setRevealed((current) => ({
+                        ...current,
+                        [environment]: true,
+                      }))
+                    }
                   }
-                }
-              />
+                />
+              )}
 
               <div className="env-value-row__actions">
                 <button
@@ -1699,14 +1742,31 @@ function EntryDialog({
                   {revealed[environment] ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
                 <button
+                  className={`icon-button icon-button--sm ${
+                    showFormatted ? "icon-button--active" : ""
+                  }`}
+                  disabled={!draft.present || busy || isMasked || parsedJson === null}
+                  onClick={() =>
+                    setFormatted((current) => ({
+                      ...current,
+                      [environment]: !current[environment],
+                    }))
+                  }
+                  aria-label={showFormatted ? "Show raw" : "Format JSON"}
+                  title={showFormatted ? "Show raw" : "Format JSON"}
+                >
+                  <Braces size={14} />
+                </button>
+                <button
                   className="icon-button icon-button--sm"
                   disabled={busy}
-                  onClick={() =>
+                  onClick={() => {
                     setValues((current) => ({
                       ...current,
                       [environment]: { present: false, value: "" },
                     }))
-                  }
+                    setFormatted((current) => ({ ...current, [environment]: false }))
+                  }}
                   aria-label="Remove value"
                 >
                   <Trash2 size={14} />

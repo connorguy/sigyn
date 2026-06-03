@@ -1392,6 +1392,29 @@ details[open] > .cli-setup-summary::before {
   -webkit-text-security: none;
 }
 
+.env-value-row__formatted {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(245, 247, 249, 0.9);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  padding: 0.6rem 0.85rem;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre;
+}
+
+.icon-button--active {
+  background: var(--accent-soft);
+  border-color: var(--accent-border-soft);
+  color: var(--accent);
+}
+
 .env-value-row__actions {
   display: flex;
   align-items: center;
