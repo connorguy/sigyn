@@ -162,16 +162,6 @@ export default function App() {
     )
   }, [snapshot])
 
-  const missingEntries = useMemo(
-    () => (activeProject ? getMissingEntries(activeProject) : []),
-    [activeProject],
-  )
-  const missingEntriesMessage = activeProject
-    ? `${missingEntries.length} entr${
-        missingEntries.length === 1 ? "y is" : "ies are"
-      } missing a value for the current effective selection and will be skipped.`
-    : null
-
   const filteredEntries = useMemo(() => {
     if (!activeProject) {
       return []
@@ -677,12 +667,10 @@ export default function App() {
                       <input
                         value={searchQuery}
                         placeholder="Search entries..."
+                        spellCheck={false}
                         onChange={(event) => setSearchQuery(event.target.value)}
                       />
                     </label>
-                    {missingEntries.length > 0 && missingEntriesMessage ? (
-                      <AlertBadge count={missingEntries.length} message={missingEntriesMessage} />
-                    ) : null}
                   </div>
                   <div className="toolbar__actions">
                     <button
@@ -726,7 +714,14 @@ export default function App() {
             {activeProject ? (
               <>
                 {filteredEntries.length > 0 ? (
-                  <div className="entry-list">
+                  <div className="entry-list" role="table" aria-label="Secrets">
+                    <div className="entry-list__head" role="row">
+                      <span />
+                      <span>Name</span>
+                      <span>Meta</span>
+                      <span>Active</span>
+                      <span>Value</span>
+                    </div>
                     {filteredEntries.map((entry) => (
                       <EntryCard
                         key={entry.id}
@@ -987,63 +982,66 @@ function EnvironmentBar({
   onReset: () => void
 }) {
   const overrideCount = Object.keys(project.entry_overrides).length
-  const isMixed = overrideCount > 0
 
-  const distribution = useMemo(() => {
-    if (!isMixed || project.entries.length === 0) {
-      return []
-    }
-    const counts: Record<string, number> = {}
+  const activationCounts = useMemo(() => {
+    const counts = Object.fromEntries(
+      project.supported_environments.map((environment) => [environment, 0]),
+    ) as Record<string, number>
+
     for (const entry of project.entries) {
       const env = getSelectedEnvironment(project, entry.id)
       counts[env] = (counts[env] ?? 0) + 1
     }
-    return Object.entries(counts).sort(([, a], [, b]) => b - a)
-  }, [project, isMixed])
+
+    return counts
+  }, [project])
+
+  const hasForeignActivations = project.supported_environments.some(
+    (env) => env !== project.active_base_environment && (activationCounts[env] ?? 0) > 0,
+  )
 
   return (
-    <div className={`env-bar ${isMixed ? "env-bar--mixed" : ""}`}>
-      <div className="env-bar__row">
-        <div className="env-bar__pills">
-          {project.supported_environments.map((env) => (
+    <div className={`env-bar ${hasForeignActivations ? "env-bar--mixed" : ""}`}>
+      <div className="env-stack">
+        {project.supported_environments.map((env) => {
+          const activeCount = activationCounts[env] ?? 0
+          const isPrimary = env === project.active_base_environment
+          const isForeignActive = !isPrimary && activeCount > 0
+
+          return (
             <button
               key={env}
-              className={`env-pill ${env === project.active_base_environment ? "env-pill--active" : ""}`}
+              className={`env-stack-card ${isPrimary ? "env-stack-card--active" : ""} ${
+                isForeignActive ? "env-stack-card--warning" : ""
+              }`}
               disabled={disabled}
               onClick={() => onSelect(env)}
             >
-              {formatEnvironmentLabel(env)}
+              <span className="env-stack-card__name">{formatEnvironmentLabel(env)}</span>
+              {activeCount > 0 ? (
+                <>
+                  <span className="env-stack-card__divider" aria-hidden="true" />
+                  <span className="env-stack-card__count">
+                    <span className="env-stack-card__count-dot" aria-hidden="true" />
+                    {activeCount}
+                  </span>
+                </>
+              ) : null}
             </button>
-          ))}
-        </div>
-
-        {isMixed && (
-          <button className="button button--ghost env-bar__reset" disabled={disabled} onClick={onReset}>
-            <RotateCcw size={14} />
-            Reset to {formatEnvironmentLabel(project.active_base_environment)}
-          </button>
-        )}
+          )
+        })}
       </div>
 
-      {isMixed && distribution.length > 0 && (
-        <div className="env-bar__mixed-summary">
-          <AlertTriangle size={14} />
-          <span>
-            Mixed — {overrideCount} entr{overrideCount === 1 ? "y" : "ies"} overridden
-          </span>
-          <div className="env-bar__dist">
-            {distribution.map(([env, count]) => (
-              <span
-                key={env}
-                className={`env-dist-chip ${
-                  env !== project.active_base_environment ? "env-dist-chip--override" : ""
-                }`}
-              >
-                {count} {formatEnvironmentLabel(env)}
-              </span>
-            ))}
-          </div>
-        </div>
+      {overrideCount > 0 && (
+        <button
+          className="button button--ghost env-bar__reset"
+          disabled={disabled}
+          onClick={onReset}
+          aria-label={`Reset to ${formatEnvironmentLabel(project.active_base_environment)}`}
+        >
+          <RotateCcw size={14} />
+          Reset
+        </button>
       )}
     </div>
   )
@@ -1132,31 +1130,32 @@ function EntryCard({
   }
 
   return (
-    <article className="entry-card">
-      <div className="entry-card__summary">
+    <article className={`entry-card ${expanded ? "entry-card--expanded" : ""}`} role="rowgroup">
+      <div className="entry-card__summary" role="row">
         <button
-          className="icon-button"
+          className="icon-button entry-card__expand"
           onClick={() => setExpanded((current) => !current)}
           aria-label={expanded ? "Collapse entry" : "Expand entry"}
         >
           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
 
-        <div className="entry-card__identity">
+        <div className="entry-card__identity" role="cell">
           <div className="entry-card__name-row">
             <span className="mono">{entry.name}</span>
             <span className={`status-dot ${hasActiveValue ? "status-dot--ok" : "status-dot--missing"}`} />
           </div>
-          {entry.category || entry.description ? (
-            <p className="muted muted--small">
-              {[entry.category, entry.description].filter(Boolean).join(" · ")}
-            </p>
-          ) : null}
         </div>
 
-        <div className="entry-card__spacer" />
+        <div className="entry-card__meta" role="cell">
+          {entry.category || entry.description ? (
+            [entry.category, entry.description].filter(Boolean).join(" · ")
+          ) : (
+            <span className="muted">-</span>
+          )}
+        </div>
 
-        <label className="entry-card__select">
+        <label className="entry-card__select" role="cell">
           <span className="muted muted--small">Active</span>
           <select
             value={selectedEnvironment}
@@ -1175,7 +1174,7 @@ function EntryCard({
           </select>
         </label>
 
-        <div className="entry-card__masked">
+        <div className="entry-card__masked" role="cell">
           {hasActiveValue ? "••••••••" : <span className="danger">not set</span>}
         </div>
       </div>
@@ -1380,13 +1379,17 @@ function ProjectDialog({
   onSubmit: (values: ProjectFormValues) => Promise<void>
 }) {
   const [name, setName] = useState(initialName)
-  const [environmentText, setEnvironmentText] = useState(initialEnvironmentText)
+  const [environmentTags, setEnvironmentTags] = useState(() =>
+    parseEnvironmentList(initialEnvironmentText),
+  )
+  const [environmentDraft, setEnvironmentDraft] = useState("")
   const [workingDirectory, setWorkingDirectory] = useState(initialWorkingDirectory)
 
   useEffect(() => {
     if (open) {
       setName(initialName)
-      setEnvironmentText(initialEnvironmentText)
+      setEnvironmentTags(parseEnvironmentList(initialEnvironmentText))
+      setEnvironmentDraft("")
       setWorkingDirectory(initialWorkingDirectory)
     }
   }, [open, initialEnvironmentText, initialName, initialWorkingDirectory])
@@ -1408,16 +1411,56 @@ function ProjectDialog({
         />
       </label>
 
-      <label>
+      <div className="form-field">
         <span>Supported environments</span>
-        <input
-          className="input"
-          value={environmentText}
-          disabled={busy}
-          placeholder="local, dev, staging, prod"
-          onChange={(event) => setEnvironmentText(event.target.value)}
-        />
-      </label>
+        <div className="tag-input">
+          {environmentTags.map((environment) => (
+            <span key={environment} className="tag-input__tag">
+              {formatEnvironmentLabel(environment)}
+              <button
+                type="button"
+                className="tag-input__remove"
+                disabled={busy}
+                onClick={() =>
+                  setEnvironmentTags((current) =>
+                    current.filter((currentEnvironment) => currentEnvironment !== environment),
+                  )
+                }
+                aria-label={`Remove ${formatEnvironmentLabel(environment)}`}
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+          <input
+            className="tag-input__input"
+            value={environmentDraft}
+            disabled={busy}
+            placeholder={environmentTags.length > 0 ? "Add environment" : "local"}
+            spellCheck={false}
+            onBlur={() => {
+              setEnvironmentTags((current) => mergeEnvironmentTags(current, environmentDraft))
+              setEnvironmentDraft("")
+            }}
+            onChange={(event) => setEnvironmentDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === ",") {
+                event.preventDefault()
+                setEnvironmentTags((current) => mergeEnvironmentTags(current, environmentDraft))
+                setEnvironmentDraft("")
+              }
+
+              if (
+                event.key === "Backspace" &&
+                environmentDraft.length === 0 &&
+                environmentTags.length > 0
+              ) {
+                setEnvironmentTags((current) => current.slice(0, -1))
+              }
+            }}
+          />
+        </div>
+      </div>
       {environmentHelpText ? <p className="muted muted--small">{environmentHelpText}</p> : null}
 
       <label>
@@ -1451,7 +1494,7 @@ function ProjectDialog({
           onClick={() =>
             void onSubmit({
               name,
-              environmentText,
+              environmentText: mergeEnvironmentTags(environmentTags, environmentDraft).join(", "),
               workingDirectory,
             })
           }
@@ -2053,31 +2096,6 @@ function Banner({
   )
 }
 
-function AlertBadge({
-  count,
-  message,
-}: {
-  count: number
-  message: string
-}) {
-  return (
-    <div className="alert-badge">
-      <button
-        type="button"
-        className="alert-badge__pill"
-        aria-label={message}
-        aria-describedby="missing-entries-tooltip"
-      >
-        <AlertTriangle size={14} />
-        <span>{count}</span>
-      </button>
-      <div id="missing-entries-tooltip" role="tooltip" className="alert-badge__tooltip">
-        {message}
-      </div>
-    </div>
-  )
-}
-
 function buildEntryDraftValues(
   project: ProjectRecord,
   entry: EntryRecord,
@@ -2104,13 +2122,6 @@ function getValueForEnvironment(entry: EntryRecord, environment: string) {
   return entry.values.find((value) => value.environment === environment) ?? null
 }
 
-function getMissingEntries(project: ProjectRecord) {
-  return project.entries.filter((entry) => {
-    const selectedEnvironment = getSelectedEnvironment(project, entry.id)
-    return !getValueForEnvironment(entry, selectedEnvironment)
-  })
-}
-
 function displayWhitespace(value: string): string {
   return value.replace(/ /g, "·").replace(/\t/g, "→")
 }
@@ -2128,6 +2139,16 @@ function parseEnvironmentList(value: string) {
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean)
+}
+
+function mergeEnvironmentTags(environments: string[], draft: string) {
+  const next = [...environments]
+  for (const environment of parseEnvironmentList(draft)) {
+    if (!next.includes(environment)) {
+      next.push(environment)
+    }
+  }
+  return next
 }
 
 function shellQuote(value: string) {
