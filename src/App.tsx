@@ -14,7 +14,6 @@ import {
   Plus,
   RotateCcw,
   Search,
-  Shield,
   Terminal,
   Trash2,
   Upload,
@@ -802,6 +801,8 @@ export default function App() {
           showCliButton={Boolean(activeProject)}
           onShowCliDialog={() => setShowCliDialog(true)}
           onAddProject={() => setShowAddProject(true)}
+          lockDisabled={busy}
+          onLock={() => void handleLock()}
         />
 
         <main className="workspace">
@@ -849,7 +850,22 @@ export default function App() {
                         </button>
                       </div>
                     ) : (
-                      <h1>{activeProject.name}</h1>
+                      <div className="workspace__title">
+                        <h1>{activeProject.name}</h1>
+                        <button
+                          className="icon-button icon-button--xs"
+                          disabled={busy}
+                          onClick={() => {
+                            setIsRenamingProject(false)
+                            setProjectNameDraft(activeProject.name)
+                            setShowEditProject(true)
+                          }}
+                          aria-label="Edit project"
+                          title="Edit project"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                      </div>
                     )}
                     <div className="workspace__meta">
                       <span>
@@ -879,25 +895,13 @@ export default function App() {
                     <button
                       className="button button--ghost button--sm"
                       disabled={busy}
-                      onClick={() => {
-                        setIsRenamingProject(false)
-                        setProjectNameDraft(activeProject.name)
-                        setShowEditProject(true)
-                      }}
-                    >
-                      <Pencil size={14} />
-                      Edit
-                    </button>
-                    <button
-                      className="button button--ghost button--sm"
-                      disabled={busy}
                       onClick={() => void handlePreview()}
                     >
                       <FileText size={14} />
                       Preview
                     </button>
                     <button
-                      className="button button--primary button--sm"
+                      className="button button--ghost button--sm"
                       disabled={busy}
                       onClick={() => void handleCopyEffectiveEnv()}
                     >
@@ -905,12 +909,20 @@ export default function App() {
                       Copy env
                     </button>
                     <button
-                      className="button button--danger button--sm"
+                      className="button button--ghost button--sm"
                       disabled={busy}
-                      onClick={handleLock}
+                      onClick={() => setShowImportEntries(true)}
                     >
-                      <Shield size={14} />
-                      Lock
+                      <Upload size={14} />
+                      Import
+                    </button>
+                    <button
+                      className="button button--primary button--sm"
+                      disabled={busy}
+                      onClick={() => setShowAddEntry(true)}
+                    >
+                      <Plus size={14} />
+                      Add entry
                     </button>
                   </div>
                 </div>
@@ -980,24 +992,6 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="toolbar__actions">
-                    <button
-                      className="button button--ghost button--sm"
-                      disabled={busy}
-                      onClick={() => setShowImportEntries(true)}
-                    >
-                      <Upload size={14} />
-                      Import
-                    </button>
-                    <button
-                      className="button button--primary button--sm"
-                      disabled={busy}
-                      onClick={() => setShowAddEntry(true)}
-                    >
-                      <Plus size={14} />
-                      Add Entry
-                    </button>
-                  </div>
                 </div>
               </>
             ) : (
@@ -1235,6 +1229,8 @@ function ProjectSidebar({
   showCliButton,
   onShowCliDialog,
   onAddProject,
+  lockDisabled,
+  onLock,
 }: {
   projects: ProjectRecord[]
   activeProjectId: string | null
@@ -1242,6 +1238,8 @@ function ProjectSidebar({
   showCliButton: boolean
   onShowCliDialog: () => void
   onAddProject: () => void
+  lockDisabled: boolean
+  onLock: () => void
 }) {
   const [projectQuery, setProjectQuery] = useState("")
   const normalizedQuery = projectQuery.trim().toLowerCase()
@@ -1323,12 +1321,18 @@ function ProjectSidebar({
         )}
       </nav>
 
-      {showCliButton ? (
-        <button className="sidebar__footer-link" onClick={onShowCliDialog}>
-          <Terminal size={14} />
-          Companion CLI
+      <div className="sidebar__footer">
+        {showCliButton ? (
+          <button className="sidebar__footer-link" onClick={onShowCliDialog}>
+            <Terminal size={14} />
+            Companion CLI
+          </button>
+        ) : null}
+        <button className="sidebar__footer-link" disabled={lockDisabled} onClick={onLock}>
+          <Lock size={14} />
+          Lock sigyn
         </button>
-      ) : null}
+      </div>
     </aside>
   )
 }
