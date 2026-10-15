@@ -245,6 +245,54 @@
       flex-wrap: wrap;
     }
 
+    .hero-install {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: min(760px, 100%);
+      margin: 28px auto 0;
+      padding: 6px 6px 6px 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: var(--shadow-card);
+      text-align: left;
+    }
+
+    .hero-install code {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow-x: auto;
+      white-space: nowrap;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+
+    .hero-install-prompt {
+      color: var(--accent);
+      font-weight: 600;
+      user-select: none;
+    }
+
+    .hero-install-copy {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .hero-install-copy:hover {
+      border-color: var(--accent-border-soft);
+      color: var(--accent);
+    }
+
     .btn {
       display: inline-flex;
       align-items: center;
@@ -1200,6 +1248,10 @@
       </a>
       <a href="#install" class="btn btn-secondary">Install</a>
     </div>
+    <div class="hero-install">
+      <code id="hero-install-cmd"><span class="hero-install-prompt">$</span> curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh | bash</code>
+      <button type="button" class="hero-install-copy" data-copy="curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh | bash">Copy</button>
+    </div>
   </div>
 </header>
 
@@ -1572,5 +1624,18 @@
   </div>
 </footer>
 
+<script>
+  document.querySelectorAll("[data-copy]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copy);
+        button.textContent = "Copied";
+      } catch {
+        button.textContent = "Select and copy";
+      }
+      setTimeout(() => { button.textContent = "Copy"; }, 1600);
+    });
+  });
+</script>
 </body>
 </html>

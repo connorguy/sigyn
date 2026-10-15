@@ -4,6 +4,14 @@ Local-first macOS desktop app and companion CLI for managing project-specific en
 
 > **Status:** early-stage project. APIs, UX, and storage details may change before a stable public release.
 
+## Quick Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh | bash
+```
+
+This builds from source, so you need macOS, Node.js, Rust and the Xcode Command Line Tools. See [Install From Source](#install-from-source) for details and options.
+
 ## Overview
 
 sigyn is built for a single developer working locally on macOS. It keeps secret values encrypted at rest, lets you assemble an effective environment from saved presets and overrides, and can launch commands with injected variables without writing a plaintext `.env` file.
