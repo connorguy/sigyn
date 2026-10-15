@@ -36,7 +36,26 @@ flowchart LR
 
 ## Install From Source
 
-`install.sh` is the current install path for source builds. It installs the app into `/Applications` and symlinks the CLI into `~/.local/bin`. Running it again performs an update, overwriting the previous app, but does not overwrite any data.
+`install.sh` builds sigyn from source, installs the app into `/Applications`, and symlinks the CLI into `~/.local/bin`. Running it again performs an update, overwriting the previous app, but does not overwrite any data.
+
+One-line install (needs the prerequisites below):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh | bash
+```
+
+Run outside a checkout, the script fetches the source into `~/Library/Caches/sigyn/source`, then builds and installs from there. Re-run the same command to update. To review the script first, download it and run it yourself:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh -o install.sh
+less install.sh
+bash install.sh
+```
+
+Optional settings:
+
+- `SIGYN_REF`: branch or tag to install (default `main`), e.g. `curl -fsSL … | SIGYN_REF=v0.1.0 bash`
+- `SIGYN_SOURCE_DIR`: where to keep the source checkout
 
 Prerequisites:
 
@@ -46,9 +65,11 @@ Prerequisites:
 - Xcode or Command Line Tools
 - accepted Xcode license
 
-Run:
+From a clone:
 
 ```sh
+git clone https://github.com/connorguy/sigyn.git
+cd sigyn
 ./install.sh
 ```
 

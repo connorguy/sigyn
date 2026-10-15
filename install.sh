@@ -6,8 +6,14 @@ set -euo pipefail
 # /Applications, and symlinks the CLI binary onto PATH.
 #
 # Usage:
-#   ./install.sh            # build + install
+#   curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh | bash
+#   ./install.sh            # build + install from this checkout
 #   ./install.sh --no-build # skip build, install from existing artifacts
+#
+# When run outside a sigyn checkout (e.g. piped from curl), the script
+# fetches the source into SIGYN_SOURCE_DIR and re-runs itself from there.
+#   SIGYN_REF         branch or tag to install (default: main)
+#   SIGYN_SOURCE_DIR  where to keep the source (default: ~/Library/Caches/sigyn/source)
 # ──────────────────────────────────────────────────────────────────────
 
 APP_NAME="sigyn"
@@ -17,7 +23,16 @@ CLI_LINK_DIR="${HOME}/.local/bin"
 CLI_BIN_NAME="sigyn"
 BUNDLE_MACOS_DIR="${INSTALL_DIR}/${APP_BUNDLE}/Contents/MacOS"
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_URL="${SIGYN_REPO:-https://github.com/connorguy/sigyn.git}"
+REPO_REF="${SIGYN_REF:-main}"
+SOURCE_DIR="${SIGYN_SOURCE_DIR:-${HOME}/Library/Caches/sigyn/source}"
+
+# Empty when the script is piped into bash rather than run from a file.
+SCRIPT_PATH="${BASH_SOURCE[0]:-}"
+SCRIPT_DIR=""
+if [[ -n "$SCRIPT_PATH" && -f "$SCRIPT_PATH" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+fi
 BUILD_BUNDLE="${SCRIPT_DIR}/build/tauri-target/release/bundle/macos/${APP_BUNDLE}"
 
 NO_BUILD=false
@@ -26,7 +41,11 @@ for arg in "$@"; do
     --no-build) NO_BUILD=true ;;
     -h|--help)
       echo "Usage: ./install.sh [--no-build]"
+      echo "       curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh | bash"
       echo "  --no-build   Skip the build step and install existing artifacts"
+      echo ""
+      echo "Outside a sigyn checkout, the source is fetched into \$SIGYN_SOURCE_DIR"
+      echo "(default ~/Library/Caches/sigyn/source) at \$SIGYN_REF (default main)."
       exit 0
       ;;
     *)
@@ -61,6 +80,50 @@ if [[ "$(uname)" != "Darwin" ]]; then
 fi
 
 ok "All prerequisites found"
+
+# ── fetch source (one-line install) ───────────────────────────────────
+# Defined as a function and called once it has been read in full, so a
+# truncated download cannot run half of it.
+
+is_source_checkout() {
+  [[ -n "$SCRIPT_DIR" && -f "${SCRIPT_DIR}/package.json" && -f "${SCRIPT_DIR}/src-tauri/tauri.conf.json" ]]
+}
+
+fetch_source_and_reexec() {
+  if [[ "${SIGYN_BOOTSTRAPPED:-}" == "1" ]]; then
+    fail "${SOURCE_DIR} does not contain the sigyn source. Remove it and try again."
+  fi
+  require_cmd git
+
+  if [[ -d "${SOURCE_DIR}/.git" ]]; then
+    local origin
+    origin="$(git -C "$SOURCE_DIR" remote get-url origin 2>/dev/null || true)"
+    if [[ "$origin" != "$REPO_URL" ]]; then
+      fail "${SOURCE_DIR} is a checkout of '${origin:-unknown}', not ${REPO_URL}. Set SIGYN_SOURCE_DIR to another path."
+    fi
+    info "Updating sigyn source in ${SOURCE_DIR} (${REPO_REF})…"
+  elif [[ -e "$SOURCE_DIR" && -n "$(ls -A "$SOURCE_DIR" 2>/dev/null)" ]]; then
+    fail "${SOURCE_DIR} already exists and is not a sigyn checkout. Set SIGYN_SOURCE_DIR to another path."
+  else
+    info "Fetching sigyn source into ${SOURCE_DIR} (${REPO_REF})…"
+    mkdir -p "$SOURCE_DIR"
+    git -C "$SOURCE_DIR" init -q
+    git -C "$SOURCE_DIR" remote add origin "$REPO_URL"
+  fi
+
+  git -C "$SOURCE_DIR" fetch -q --depth 1 origin "$REPO_REF"
+  # This directory is managed by the installer: tracked files are reset,
+  # untracked build caches (node_modules, build/, .cargo-home) are kept.
+  git -C "$SOURCE_DIR" checkout -q --force --detach FETCH_HEAD
+  ok "Source ready at $(git -C "$SOURCE_DIR" rev-parse --short HEAD)"
+
+  export SIGYN_BOOTSTRAPPED=1
+  exec bash "${SOURCE_DIR}/install.sh" "$@"
+}
+
+if ! is_source_checkout; then
+  fetch_source_and_reexec "$@"
+fi
 
 # ── build ─────────────────────────────────────────────────────────────
 
@@ -175,6 +238,10 @@ if [[ -d "$INSTALLED_APP" ]] && [[ -L "$CLI_LINK" ]]; then
   echo ""
   echo "  App:  ${INSTALLED_APP}"
   echo "  CLI:  ${CLI_LINK}"
+  if [[ "${SIGYN_BOOTSTRAPPED:-}" == "1" ]]; then
+    echo "  Source: ${SCRIPT_DIR}"
+    echo "  Update: re-run the same install command"
+  fi
   echo ""
   echo "  First launch: macOS will prompt for keychain access — choose \"Always Allow\""
   echo "  so you are not reprompted on every run."

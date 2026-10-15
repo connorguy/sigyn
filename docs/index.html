@@ -1060,6 +1060,18 @@
       line-height: 1.7;
     }
 
+    .install-step code.nowrap-code {
+      white-space: nowrap;
+    }
+
+    .install-step code.inline-code {
+      display: inline;
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      line-height: inherit;
+    }
+
     .prereq-list {
       list-style: none;
       display: flex;
@@ -1186,7 +1198,7 @@
         <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         View on GitHub
       </a>
-      <a href="#install" class="btn btn-secondary">Install from Source</a>
+      <a href="#install" class="btn btn-secondary">Install</a>
     </div>
   </div>
 </header>
@@ -1511,8 +1523,8 @@
 <section id="install">
   <div class="container">
     <div class="section-label">Install</div>
-    <h2 class="section-title">Clone, build, done</h2>
-    <p class="section-desc">One script handles the whole thing: builds the Tauri app, drops it in /Applications, and symlinks the CLI onto your PATH. Go grab coffee while Rust compiles.</p>
+    <h2 class="section-title">Paste, build, done</h2>
+    <p class="section-desc">One command handles the whole thing: fetches the source, builds the Tauri app, drops it in /Applications, and symlinks the CLI onto your PATH. Run it again to update. Go grab coffee while Rust compiles.</p>
 
     <div class="install-steps">
       <div class="install-step">
@@ -1528,9 +1540,9 @@
       </div>
       <div class="install-step">
         <div class="step-number">02</div>
-        <h3>Clone &amp; Install</h3>
-        <p>Three lines and a cup of patience:</p>
-        <code>git clone https://github.com/connorguy/sigyn.git<br>cd sigyn<br>./install.sh</code>
+        <h3>Install</h3>
+        <p>One line and a cup of patience. Prefer to read it first? Clone the repo and run <code class="inline-code">./install.sh</code>.</p>
+        <code class="nowrap-code">curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh | bash</code>
       </div>
       <div class="install-step">
         <div class="step-number">03</div>
