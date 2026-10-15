@@ -210,7 +210,19 @@ Behavior:
 - does not write a `.env` file
 - inherits the parent shell environment and then adds or overrides project variables
 
-**AI coding agents:** every `--help` screen ends with a note telling agents they may only run `sigyn <command>` with no sigyn flags or subcommands. Anything else (`--project`, `--env`, `--cwd`, `run`, `preview`, `list`, …) needs explicit approval from the developer overseeing the task.
+### Using sigyn with coding agents
+
+Set up the project and its variables in the app, then have your agent prepend `sigyn` to the commands that need them. To brief an agent, have it run:
+
+```sh
+sigyn --agent-skill
+```
+
+It prints a short guide: what sigyn is, that it should run `sigyn <command>` with no flags or subcommands, and that anything else (`--project`, `--env`, `--cwd`, `run`, `preview`, `list`, …) needs your explicit approval. Every `--help` screen ends with the same rule. To make it stick, add a line like this to your project's `AGENTS.md` or `CLAUDE.md`:
+
+```md
+This project's env vars come from sigyn. Run `sigyn --agent-skill` before running commands that need them.
+```
 
 For destructive local cleanup during development:
 

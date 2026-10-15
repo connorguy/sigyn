@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::Command};
+use std::{ffi::OsStr, path::PathBuf, process::Command};
 
 use clap::{Parser, Subcommand};
 use zeroize::Zeroize;
@@ -29,7 +29,33 @@ NOTE FOR AI AGENTS AND AUTOMATED TOOLS:
     - any subcommand: run, preview, list, ...
 
   `sigyn preview` prints secret values. Do not run it unless the developer
-  has asked you to.";
+  has asked you to. `sigyn --agent-skill` is always fine to run.";
+
+/// Printed by `sigyn --agent-skill` (or `-agent-skill`) for coding agents to read.
+const AGENT_SKILL: &str = "\
+# sigyn
+
+sigyn runs a command with a project's environment variables (secrets
+included) injected, so no .env file is needed. The developer sets up the
+project, picks the environment, and manages every variable in the sigyn
+app. Your only job is to prepend `sigyn` to the command that needs them.
+
+## Usage
+
+    sigyn <command> [args...]
+
+For example: `sigyn npm run dev`, `sigyn uv run pytest`, `sigyn cargo run`.
+
+## Rules
+
+- Run sigyn with no flags or subcommands. Do not pass --project, --env or
+  --cwd, and do not run `sigyn run`, `sigyn preview` or `sigyn list`,
+  unless the developer has expressly told you to.
+- If a variable is missing or wrong, ask the developer to change it in the
+  sigyn app. Do not work around sigyn with .env files or exported secrets.
+- Each run asks the developer for Touch ID or their password. If they
+  decline, stop and ask them what to do.
+";
 
 #[derive(Debug, Parser)]
 #[command(
@@ -52,6 +78,10 @@ pub struct Cli {
     /// Working directory for the child command
     #[arg(long)]
     cwd: Option<PathBuf>,
+
+    /// Print instructions for AI coding agents on how to use sigyn
+    #[arg(long = "agent-skill")]
+    agent_skill: bool,
 
     /// Command to run (after --)
     #[arg(trailing_var_arg = true)]
@@ -95,7 +125,19 @@ struct CliResolvedEnv {
 }
 
 pub fn run_cli() -> Result<(), AppError> {
+    // Also accept the single-dash `-agent-skill`, which clap would read as
+    // bundled short flags. Only the first argument counts: anything after
+    // the command belongs to the child process.
+    if std::env::args_os().nth(1).is_some_and(|arg| is_agent_skill_flag(&arg)) {
+        print!("{AGENT_SKILL}");
+        return Ok(());
+    }
+
     let cli = Cli::parse();
+    if cli.agent_skill {
+        print!("{AGENT_SKILL}");
+        return Ok(());
+    }
 
     match cli.command {
         Some(Commands::List) => list_projects(),
@@ -117,6 +159,10 @@ pub fn run_cli() -> Result<(), AppError> {
             }
         }
     }
+}
+
+fn is_agent_skill_flag(arg: &OsStr) -> bool {
+    arg == "-agent-skill" || arg == "--agent-skill"
 }
 
 fn run_command(
@@ -387,8 +433,28 @@ fn delete_master_key_via_security_tool() -> Result<bool, AppError> {
 mod tests {
     use clap::CommandFactory;
 
-    use super::{auth_reason, display_command, sanitize_prompt_text, Cli, AGENT_NOTICE};
+    use clap::Parser;
+    use std::ffi::OsStr;
+
+    use super::{
+        auth_reason, display_command, is_agent_skill_flag, sanitize_prompt_text, Cli, AGENT_NOTICE,
+    };
     use crate::store::RunTargetSummary;
+
+    #[test]
+    fn agent_skill_flag_is_recognized_only_as_a_sigyn_flag() {
+        assert!(is_agent_skill_flag(OsStr::new("-agent-skill")));
+        assert!(is_agent_skill_flag(OsStr::new("--agent-skill")));
+        assert!(!is_agent_skill_flag(OsStr::new("npm")));
+
+        let cli = Cli::try_parse_from(["sigyn", "--agent-skill"]).expect("flag parses");
+        assert!(cli.agent_skill);
+
+        // After the command, the flag belongs to the child process.
+        let cli = Cli::try_parse_from(["sigyn", "npm", "--agent-skill"]).expect("command parses");
+        assert!(!cli.agent_skill);
+        assert_eq!(cli.command_args, vec!["npm", "--agent-skill"]);
+    }
 
     #[test]
     fn every_help_screen_carries_the_agent_notice() {

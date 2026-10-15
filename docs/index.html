@@ -1011,6 +1011,21 @@
       color: var(--text);
     }
 
+    .cli-example--wide {
+      grid-column: 1 / -1;
+    }
+
+    .cli-example-desc {
+      padding: 0 16px 16px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .cli-example-desc code {
+      font-family: var(--font-mono);
+      font-size: 0.82em;
+    }
+
     .cli-example .prompt { color: var(--accent); font-weight: 600; }
     .cli-example .flag { color: var(--success); }
     .cli-example .string { color: var(--accent-strong); }
@@ -1561,6 +1576,11 @@
       <div class="cli-example">
         <div class="cli-example-header">Reset (development only)</div>
         <pre><span class="prompt">$</span> sigyn reset-test-data <span class="flag">--confirm</span> <span class="string">"delete all data"</span></pre>
+      </div>
+      <div class="cli-example cli-example--wide">
+        <div class="cli-example-header">For coding agents</div>
+        <pre><span class="prompt">$</span> sigyn <span class="flag">--agent-skill</span></pre>
+        <p class="cli-example-desc">Prints a short brief for your agent: you set up the env in the app, it just prepends <code>sigyn</code> to its commands, and anything beyond that (flags, <code>preview</code>, <code>run</code>, …) needs your say-so.</p>
       </div>
     </div>
 

@@ -1366,6 +1366,11 @@ function CliDialog({
       <code className="code-block">
         {`# uses the active project (${project.name})\nsigyn uv run python -m your_module\n\n# target a specific project\nsigyn run --project ${shellQuote(project.name)} -- uv run python -m your_module`}
       </code>
+
+      <p className="muted muted--small">
+        Using a coding agent? Have it run <code>sigyn --agent-skill</code>. It tells the agent
+        to prepend <code>sigyn</code> to its commands and to ask you before using any flags.
+      </p>
     </Modal>
   )
 }
