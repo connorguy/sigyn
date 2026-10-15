@@ -3,10 +3,15 @@ use std::{path::PathBuf, process::Command};
 use clap::{Parser, Subcommand};
 use zeroize::Zeroize;
 
-use crate::{error::AppError, ipc, macos_auth, store::Store};
+use crate::{
+    error::AppError,
+    ipc, macos_auth,
+    store::{RunTargetSummary, Store},
+};
 
 const KEYCHAIN_SERVICE: &str = "sigyn";
 const KEYCHAIN_ACCOUNT: &str = "master-key";
+const AUTH_REASON_COMMAND_MAX_CHARS: usize = 80;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -73,7 +78,7 @@ pub fn run_cli() -> Result<(), AppError> {
     match cli.command {
         Some(Commands::List) => list_projects(),
         Some(Commands::Preview) => {
-            let resolved = resolve_env(cli.project, cli.env)?;
+            let resolved = resolve_env(cli.project, cli.env, None)?;
             println!("{}", resolved.serialized);
             Ok(())
         }
@@ -98,7 +103,7 @@ fn run_command(
     cwd: Option<PathBuf>,
     command: Vec<String>,
 ) -> Result<(), AppError> {
-    let resolved = resolve_env(project, environment)?;
+    let resolved = resolve_env(project, environment, Some(command.as_slice()))?;
     let executable = command
         .first()
         .cloned()
@@ -151,8 +156,18 @@ fn list_projects() -> Result<(), AppError> {
     Ok(())
 }
 
-fn resolve_env(project: Option<String>, environment: Option<String>) -> Result<CliResolvedEnv, AppError> {
-    with_local_decryption(|store, key| {
+fn resolve_env(
+    project: Option<String>,
+    environment: Option<String>,
+    command: Option<&[String]>,
+) -> Result<CliResolvedEnv, AppError> {
+    let store = Store::new()?;
+    // Read the (non-secret) target first so a bad --project/--env fails before the
+    // prompt, and so the prompt can say exactly what is being unlocked and for what.
+    let target = store.describe_run_target(project.as_deref(), environment.as_deref())?;
+    let reason = auth_reason(&target, command);
+
+    with_local_decryption(&store, &reason, |store, key| {
         let (working_directory, serialized, env_vars) = match project.as_deref() {
             Some(name) => store.preview_project_by_name(name, environment.as_deref(), key)?,
             None => {
@@ -171,13 +186,71 @@ fn resolve_env(project: Option<String>, environment: Option<String>) -> Result<C
 }
 
 fn with_local_decryption<T>(
+    store: &Store,
+    reason: &str,
     operation: impl FnOnce(&Store, &[u8]) -> Result<T, AppError>,
 ) -> Result<T, AppError> {
-    let store = Store::new()?;
-    let mut key = macos_auth::authenticate_and_load_master_key(&store)?;
-    let result = operation(&store, &key);
+    let mut key = macos_auth::authenticate_and_load_master_key(store, reason)?;
+    let result = operation(store, &key);
     key.zeroize();
     result
+}
+
+/// Builds the LocalAuthentication reason. macOS renders it as
+/// "<app> is trying to <reason>.", so it reads as a verb phrase.
+fn auth_reason(target: &RunTargetSummary, command: Option<&[String]>) -> String {
+    let mut setup = format!(
+        "{} · {}",
+        sanitize_prompt_text(&target.project_name),
+        sanitize_prompt_text(&target.base_environment)
+    );
+    if target.environment_from_cli {
+        setup.push_str(" (--env)");
+    }
+    match target.override_count {
+        0 => {}
+        1 => setup.push_str(" + 1 override"),
+        count => setup.push_str(&format!(" + {count} overrides")),
+    }
+
+    match command {
+        Some(command) => format!("inject {setup} into `{}`", display_command(command)),
+        None => format!("print the {setup} env"),
+    }
+}
+
+fn display_command(command: &[String]) -> String {
+    let joined = command
+        .iter()
+        .map(|arg| {
+            let arg = sanitize_prompt_text(arg);
+            if arg.is_empty() || arg.contains(char::is_whitespace) {
+                format!("'{arg}'")
+            } else {
+                arg
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    if joined.chars().count() > AUTH_REASON_COMMAND_MAX_CHARS {
+        let truncated: String = joined.chars().take(AUTH_REASON_COMMAND_MAX_CHARS - 1).collect();
+        format!("{}…", truncated.trim_end())
+    } else {
+        joined
+    }
+}
+
+/// Keeps caller-supplied text from reshaping the system prompt (newlines, control chars).
+fn sanitize_prompt_text(value: &str) -> String {
+    value
+        .chars()
+        .map(|char| if char.is_control() { ' ' } else { char })
+        .collect::<String>()
+        .split(' ')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn reject_unsafe_env_names(env_vars: &[(String, String)]) -> Result<(), AppError> {
@@ -239,7 +312,7 @@ fn reset_test_data(confirm: Option<String>) -> Result<(), AppError> {
         ));
     }
 
-    macos_auth::authenticate_unlock()?;
+    macos_auth::authenticate_unlock("delete all local sigyn data and its keychain entry")?;
 
     let report = Store::reset_test_data()?;
     let keychain_removed = delete_master_key_via_security_tool()?;
@@ -286,4 +359,62 @@ fn delete_master_key_via_security_tool() -> Result<bool, AppError> {
     }
 
     Err(AppError::Auth(stderr.trim().to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{auth_reason, display_command, sanitize_prompt_text};
+    use crate::store::RunTargetSummary;
+
+    fn target(override_count: usize, environment_from_cli: bool) -> RunTargetSummary {
+        RunTargetSummary {
+            project_name: "retail-service".into(),
+            base_environment: "prod".into(),
+            environment_from_cli,
+            override_count,
+        }
+    }
+
+    fn args(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| value.to_string()).collect()
+    }
+
+    #[test]
+    fn run_reason_names_project_env_overrides_and_command() {
+        let command = args(&["uv", "run", "python", "-m", "app"]);
+        assert_eq!(
+            auth_reason(&target(2, false), Some(command.as_slice())),
+            "inject retail-service · prod + 2 overrides into `uv run python -m app`"
+        );
+    }
+
+    #[test]
+    fn preview_reason_marks_cli_env_and_single_override() {
+        assert_eq!(
+            auth_reason(&target(1, true), None),
+            "print the retail-service · prod (--env) + 1 override env"
+        );
+        assert_eq!(
+            auth_reason(&target(0, false), None),
+            "print the retail-service · prod env"
+        );
+    }
+
+    #[test]
+    fn display_command_quotes_whitespace_and_truncates() {
+        assert_eq!(
+            display_command(&args(&["npm", "run", "dev server", ""])),
+            "npm run 'dev server' ''"
+        );
+
+        let long = args(&["echo", &"x".repeat(200)]);
+        let shown = display_command(&long);
+        assert_eq!(shown.chars().count(), 80);
+        assert!(shown.ends_with('…'));
+    }
+
+    #[test]
+    fn prompt_text_strips_control_characters() {
+        assert_eq!(sanitize_prompt_text("npm\n\nApproved by IT\t ok"), "npm Approved by IT ok");
+    }
 }

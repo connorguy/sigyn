@@ -1,8 +1,11 @@
 use crate::{error::AppError, store::Store};
 
+/// Shown by macOS as "<app> is trying to <reason>." in the Touch ID / password prompt.
+pub const DEFAULT_UNLOCK_REASON: &str = "unlock sigyn and access stored secrets";
+
 #[cfg(target_os = "macos")]
-pub fn authenticate_unlock() -> Result<(), AppError> {
-    auth::authenticate_unlock()
+pub fn authenticate_unlock(reason: &str) -> Result<(), AppError> {
+    auth::authenticate_unlock(reason)
 }
 
 #[cfg(target_os = "macos")]
@@ -15,8 +18,8 @@ pub fn create_master_key() -> Result<Vec<u8>, AppError> {
     keychain::create_master_key()
 }
 
-pub fn authenticate_and_load_master_key(store: &Store) -> Result<Vec<u8>, AppError> {
-    authenticate_unlock()?;
+pub fn authenticate_and_load_master_key(store: &Store, reason: &str) -> Result<Vec<u8>, AppError> {
+    authenticate_unlock(reason)?;
     load_or_create_master_key(store)
 }
 
@@ -51,10 +54,10 @@ mod auth {
 
     use crate::error::AppError;
 
-    pub(super) fn authenticate_unlock() -> Result<(), AppError> {
+    pub(super) fn authenticate_unlock(reason: &str) -> Result<(), AppError> {
         autoreleasepool(|_| {
             let context = unsafe { LAContext::new() };
-            let reason = NSString::from_str("unlock sigyn and access stored secrets");
+            let reason = NSString::from_str(reason);
 
             unsafe {
                 context

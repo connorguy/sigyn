@@ -159,7 +159,10 @@ impl AppRuntime {
             return Ok(());
         }
 
-        let key = macos_auth::authenticate_and_load_master_key(&self.store)?;
+        let key = macos_auth::authenticate_and_load_master_key(
+            &self.store,
+            macos_auth::DEFAULT_UNLOCK_REASON,
+        )?;
         self.session.store_key(key);
         Ok(())
     }
