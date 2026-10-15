@@ -13,10 +13,29 @@ const KEYCHAIN_SERVICE: &str = "sigyn";
 const KEYCHAIN_ACCOUNT: &str = "master-key";
 const AUTH_REASON_COMMAND_MAX_CHARS: usize = 80;
 
+/// Shown at the end of every help screen so coding agents see it before using the CLI.
+const AGENT_NOTICE: &str = "\
+NOTE FOR AI AGENTS AND AUTOMATED TOOLS:
+  The only use you may make without asking is running a command through
+  sigyn with no sigyn flags or subcommands:
+
+      sigyn <command> [args...]
+
+  That injects the project and environment the developer selected in the
+  sigyn app. Anything beyond it needs explicit approval from the developer
+  overseeing your task before you run it, including:
+
+    - any flag: --project, --env, --cwd
+    - any subcommand: run, preview, list, ...
+
+  `sigyn preview` prints secret values. Do not run it unless the developer
+  has asked you to.";
+
 #[derive(Debug, Parser)]
 #[command(
     name = "sigyn",
-    about = "Preview or run project environments with local macOS authentication."
+    about = "Preview or run project environments with local macOS authentication.",
+    after_help = AGENT_NOTICE
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -42,11 +61,13 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// List all projects
-    #[command(alias = "ls")]
+    #[command(alias = "ls", after_help = AGENT_NOTICE)]
     List,
     /// Show the effective env for a project
+    #[command(after_help = AGENT_NOTICE)]
     Preview,
     /// Run a command with injected env vars
+    #[command(after_help = AGENT_NOTICE)]
     Run {
         #[arg(long)]
         cwd: Option<PathBuf>,
@@ -55,7 +76,8 @@ enum Commands {
     },
     #[command(
         about = "Delete local test data and the keychain entry",
-        hide = true
+        hide = true,
+        after_help = AGENT_NOTICE
     )]
     ResetTestData {
         #[arg(
@@ -363,8 +385,23 @@ fn delete_master_key_via_security_tool() -> Result<bool, AppError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{auth_reason, display_command, sanitize_prompt_text};
+    use clap::CommandFactory;
+
+    use super::{auth_reason, display_command, sanitize_prompt_text, Cli, AGENT_NOTICE};
     use crate::store::RunTargetSummary;
+
+    #[test]
+    fn every_help_screen_carries_the_agent_notice() {
+        let mut command = Cli::command();
+        assert!(command.render_help().to_string().contains(AGENT_NOTICE));
+        for name in ["list", "preview", "run", "reset-test-data"] {
+            let subcommand = command.find_subcommand_mut(name).expect("subcommand exists");
+            assert!(
+                subcommand.render_help().to_string().contains(AGENT_NOTICE),
+                "{name} help is missing the agent notice"
+            );
+        }
+    }
 
     fn target(override_count: usize, environment_from_cli: bool) -> RunTargetSummary {
         RunTargetSummary {

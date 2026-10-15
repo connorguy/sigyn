@@ -202,6 +202,8 @@ Behavior:
 - does not write a `.env` file
 - inherits the parent shell environment and then adds or overrides project variables
 
+**AI coding agents:** every `--help` screen ends with a note telling agents they may only run `sigyn <command>` with no sigyn flags or subcommands. Anything else (`--project`, `--env`, `--cwd`, `run`, `preview`, `list`, …) needs explicit approval from the developer overseeing the task.
+
 For destructive local cleanup during development:
 
 ```sh
