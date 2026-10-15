@@ -32,6 +32,7 @@ flowchart LR
 - mixed presets through per-entry overrides (base env + per-entry overrides from other envs)
 - preview and clipboard export of the effective env
 - CLI execution with injected environment variables
+- a built-in brief for AI coding agents (`sigyn --agent-skill`)
 - macOS device authentication before secret access
 
 ## Current Scope
@@ -62,7 +63,7 @@ bash install.sh
 
 Optional settings:
 
-- `SIGYN_REF`: branch or tag to install (default `main`), e.g. `curl -fsSL … | SIGYN_REF=v0.1.0 bash`
+- `SIGYN_REF`: branch or tag to install (default `main`), e.g. `curl -fsSL … | SIGYN_REF=<branch-or-tag> bash`
 - `SIGYN_SOURCE_DIR`: where to keep the source checkout
 
 Prerequisites:

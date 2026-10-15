@@ -1784,11 +1784,6 @@ details[open] > .cli-setup-summary::before {
   opacity: 0.32;
 }
 
-.entry-card__textarea-label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
 
 .entry-grid {
   display: grid;
@@ -1955,6 +1950,14 @@ details[open] > .cli-setup-summary::before {
   justify-content: flex-end;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+.modal__footer .button {
+  min-height: 2.15rem;
+  padding: 0 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  box-shadow: none;
 }
 
 .modal__footer-action--danger {

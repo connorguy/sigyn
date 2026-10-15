@@ -59,13 +59,13 @@ type ValueDraft = {
   value: string
 }
 
-type BannerNotice = {
+type Notice = {
   tone: "success" | "warning"
   message: string
   detail?: string
 }
 
-type ToastNotice = BannerNotice & {
+type ToastNotice = Notice & {
   id: number
 }
 
@@ -150,7 +150,7 @@ export default function App() {
   const noticeSequence = useRef(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  function setNotice(next: BannerNotice | null) {
+  function setNotice(next: Notice | null) {
     noticeSequence.current += 1
     setNoticeState(next ? { ...next, id: noticeSequence.current } : null)
   }
@@ -416,7 +416,7 @@ export default function App() {
 
   async function applySnapshotAction(
     action: Promise<AppSnapshot>,
-    successNotice?: BannerNotice,
+    successNotice?: Notice,
   ) {
     setBusy(true)
     setError(null)
@@ -494,7 +494,7 @@ export default function App() {
     }
   }
 
-  async function requestLock(nextNotice: BannerNotice) {
+  async function requestLock(nextNotice: Notice) {
     if (!snapshot || snapshot.locked || autoLockInFlight.current) {
       return
     }
@@ -2760,7 +2760,7 @@ function PreviewDialog({
         ))}
       </div>
 
-      <label className="entry-card__textarea-label">
+      <label>
         <span>.env serialization</span>
         <textarea className="textarea textarea--preview" value={preview.serialized} readOnly />
       </label>

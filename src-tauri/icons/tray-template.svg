@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <!-- sigyn menu bar icon: a person with a key badge. Used as a macOS template image
-       (only alpha matters); render to icons/tray-template.png. -->
+       (only alpha matters). After editing, regenerate the PNG that lib.rs embeds:
+       rsvg-convert -w 64 -h 64 tray-template.svg -o tray-template.png -->
   <defs>
     <mask id="key-gap" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
       <rect width="64" height="64" fill="#fff"/>
