@@ -1332,7 +1332,7 @@ details[open] > .cli-setup-summary::before {
 }
 
 .env-cell--empty .env-cell__mark {
-  border: 1.5px dashed rgba(29, 35, 44, 0.26);
+  border: 1.5px solid rgba(29, 35, 44, 0.2);
 }
 
 .env-cell:hover:not(:disabled):not([aria-pressed="true"]) .env-cell__mark {
@@ -1354,7 +1354,7 @@ details[open] > .cli-setup-summary::before {
 }
 
 .env-cell--active-missing .env-cell__mark {
-  border: 1.5px dashed var(--missing);
+  border: 1.5px solid var(--missing);
   background: var(--surface-strong);
   box-shadow:
     0 0 0 2px var(--surface-strong),
