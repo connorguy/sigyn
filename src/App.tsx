@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import type { ReactNode } from "react"
+import type { CSSProperties, ReactNode } from "react"
 import { listen } from "@tauri-apps/api/event"
 import {
   AlertTriangle,
   Check,
-  ChevronDown,
-  ChevronRight,
   Copy,
   Eye,
   EyeOff,
+  FileText,
+  GitBranch,
   Lock,
   Pencil,
   Plus,
@@ -63,7 +63,24 @@ type ValueDraft = {
 type BannerNotice = {
   tone: "success" | "warning"
   message: string
+  detail?: string
 }
+
+type ToastNotice = BannerNotice & {
+  id: number
+}
+
+type EntryFilter = "all" | "overrides" | "missing"
+
+type EntryStatus = {
+  environment: string
+  overridden: boolean
+  missing: boolean
+}
+
+type PanelExitTarget =
+  | { kind: "entry"; entryId: string | null }
+  | { kind: "project"; projectId: string }
 
 type ProjectFormValues = {
   name: string
@@ -88,14 +105,36 @@ const SESSION_TOUCH_THROTTLE_MS = 60 * 1000
 const CLIPBOARD_CLEAR_DELAY_MS = 60 * 1000
 const SNAPSHOT_UPDATED_EVENT = "snapshot-updated"
 const OBSCURED_SECRET_MASK = "••••••••"
+const EMPTY_VALUE_DRAFT: ValueDraft = { present: false, value: "" }
+const ENV_ABBREVIATIONS: Record<string, string> = {
+  local: "LOC",
+  dev: "DEV",
+  development: "DEV",
+  test: "TST",
+  testing: "TST",
+  qa: "QA",
+  uat: "UAT",
+  ci: "CI",
+  preview: "PRV",
+  sandbox: "SBX",
+  demo: "DMO",
+  stage: "STG",
+  staging: "STG",
+  prod: "PRD",
+  production: "PRD",
+}
 
 export default function App() {
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<BannerNotice | null>(null)
+  const [notice, setNoticeState] = useState<ToastNotice | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [entryFilter, setEntryFilter] = useState<EntryFilter>("all")
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
+  const [panelDirty, setPanelDirty] = useState(false)
+  const [pendingPanelExit, setPendingPanelExit] = useState<PanelExitTarget | null>(null)
   const [preview, setPreview] = useState<PreviewResult | null>(null)
   const [showAddProject, setShowAddProject] = useState(false)
   const [showEditProject, setShowEditProject] = useState(false)
@@ -109,6 +148,13 @@ export default function App() {
   const autoLockInFlight = useRef(false)
   const lastSessionTouchAt = useRef(0)
   const sessionTouchInFlight = useRef(false)
+  const noticeSequence = useRef(0)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  function setNotice(next: BannerNotice | null) {
+    noticeSequence.current += 1
+    setNoticeState(next ? { ...next, id: noticeSequence.current } : null)
+  }
 
   useEffect(() => {
     void loadInitialSnapshot()
@@ -162,24 +208,153 @@ export default function App() {
     )
   }, [snapshot])
 
+  const entryStatuses = useMemo(() => {
+    const statuses: Record<string, EntryStatus> = {}
+    if (activeProject) {
+      for (const entry of activeProject.entries) {
+        statuses[entry.id] = getEntryStatus(activeProject, entry)
+      }
+    }
+    return statuses
+  }, [activeProject])
+
+  const entryCounts = useMemo(() => {
+    const statuses = Object.values(entryStatuses)
+    return {
+      all: statuses.length,
+      overrides: statuses.filter((status) => status.overridden).length,
+      missing: statuses.filter((status) => status.missing).length,
+    }
+  }, [entryStatuses])
+
   const filteredEntries = useMemo(() => {
     if (!activeProject) {
       return []
     }
 
     const normalizedQuery = searchQuery.trim().toLowerCase()
-    if (!normalizedQuery) {
-      return activeProject.entries
-    }
 
     return activeProject.entries.filter((entry) => {
+      const status = entryStatuses[entry.id]
+      if (entryFilter === "overrides" && !status?.overridden) {
+        return false
+      }
+      if (entryFilter === "missing" && !status?.missing) {
+        return false
+      }
+      if (!normalizedQuery) {
+        return true
+      }
       return (
         entry.name.toLowerCase().includes(normalizedQuery) ||
         (entry.category ?? "").toLowerCase().includes(normalizedQuery) ||
         (entry.description ?? "").toLowerCase().includes(normalizedQuery)
       )
     })
-  }, [activeProject, searchQuery])
+  }, [activeProject, entryFilter, entryStatuses, searchQuery])
+
+  const selectedEntry = useMemo(() => {
+    if (!activeProject || !selectedEntryId) {
+      return null
+    }
+    return activeProject.entries.find((entry) => entry.id === selectedEntryId) ?? null
+  }, [activeProject, selectedEntryId])
+
+  const anyDialogOpen =
+    showAddProject ||
+    showEditProject ||
+    showAddEntry ||
+    showImportEntries ||
+    showCliDialog ||
+    Boolean(preview) ||
+    Boolean(entryDeleteTarget) ||
+    Boolean(projectDeleteTarget)
+
+  useEffect(() => {
+    // Saving or discarding resolves a pending "unsaved changes" prompt.
+    if (pendingPanelExit && !panelDirty) {
+      performPanelExit(pendingPanelExit)
+    }
+  }, [panelDirty, pendingPanelExit])
+
+  useEffect(() => {
+    if (selectedEntryId && !selectedEntry) {
+      setSelectedEntryId(null)
+      setPanelDirty(false)
+      setPendingPanelExit(null)
+    }
+  }, [selectedEntry, selectedEntryId])
+
+  useEffect(() => {
+    if (!activeProject) {
+      return undefined
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (anyDialogOpen || event.defaultPrevented) {
+        return
+      }
+
+      const target = event.target as HTMLElement | null
+      const editing =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        Boolean(target?.isContentEditable)
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+        return
+      }
+
+      if (event.key === "Escape") {
+        if (editing) {
+          target?.blur()
+          return
+        }
+        if (selectedEntryId) {
+          event.preventDefault()
+          requestPanelExit({ kind: "entry", entryId: null })
+        }
+        return
+      }
+
+      if (editing || event.metaKey || event.ctrlKey || event.altKey) {
+        return
+      }
+
+      if (event.key === "/") {
+        event.preventDefault()
+        searchInputRef.current?.focus()
+        return
+      }
+
+      const step =
+        event.key === "ArrowDown" || event.key === "j"
+          ? 1
+          : event.key === "ArrowUp" || event.key === "k"
+            ? -1
+            : 0
+      if (step === 0 || filteredEntries.length === 0) {
+        return
+      }
+
+      event.preventDefault()
+      const currentIndex = filteredEntries.findIndex((entry) => entry.id === selectedEntryId)
+      const nextIndex =
+        currentIndex === -1
+          ? step > 0
+            ? 0
+            : filteredEntries.length - 1
+          : Math.min(Math.max(currentIndex + step, 0), filteredEntries.length - 1)
+      requestPanelExit({ kind: "entry", entryId: filteredEntries[nextIndex].id })
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  })
 
   useEffect(() => {
     if (activeProject && !isRenamingProject) {
@@ -280,6 +455,10 @@ export default function App() {
   function resetTransientUi() {
     setPreview(null)
     setSearchQuery("")
+    setEntryFilter("all")
+    setSelectedEntryId(null)
+    setPanelDirty(false)
+    setPendingPanelExit(null)
     setShowCliDialog(false)
     setIsRenamingProject(false)
     setShowAddEntry(false)
@@ -328,6 +507,71 @@ export default function App() {
     } finally {
       autoLockInFlight.current = false
     }
+  }
+
+  function requestPanelExit(target: PanelExitTarget) {
+    if (target.kind === "entry" && target.entryId === selectedEntryId) {
+      return
+    }
+    if (selectedEntryId && panelDirty) {
+      setPendingPanelExit(target)
+      return
+    }
+    performPanelExit(target)
+  }
+
+  function performPanelExit(target: PanelExitTarget) {
+    setPendingPanelExit(null)
+    setPanelDirty(false)
+    if (target.kind === "entry") {
+      setSelectedEntryId(target.entryId)
+      return
+    }
+    setSelectedEntryId(null)
+    setEntryFilter("all")
+    void applySnapshotAction(selectProject(target.projectId))
+  }
+
+  async function handleSelectBaseEnvironment(project: ProjectRecord, environment: string) {
+    if (environment === project.active_base_environment) {
+      return
+    }
+
+    const clearedOverrides = project.entries.filter(
+      (entry) => getEntryStatus(project, entry).overridden,
+    ).length
+    const label = formatEnvironmentLabel(environment)
+    await applySnapshotAction(
+      setBaseEnvironment(project.id, environment),
+      clearedOverrides > 0
+        ? {
+            tone: "warning",
+            message: `Default set to ${label}.`,
+            detail: `Cleared ${clearedOverrides} per-entry override${clearedOverrides === 1 ? "" : "s"}.`,
+          }
+        : { tone: "success", message: `Default set to ${label}.` },
+    )
+  }
+
+  async function handleSelectEntryEnvironment(
+    project: ProjectRecord,
+    entry: EntryRecord,
+    environment: string,
+  ) {
+    if (environment === getSelectedEnvironment(project, entry.id)) {
+      return true
+    }
+
+    const isBase = environment === project.active_base_environment
+    return applySnapshotAction(
+      setEntryOverride(project.id, entry.id, isBase ? null : environment),
+      {
+        tone: "success",
+        message: isBase
+          ? `${entry.name} back on ${formatEnvironmentLabel(environment)} (default).`
+          : `${entry.name} now uses ${formatEnvironmentLabel(environment)}.`,
+      },
+    )
   }
 
   async function handleUnlock() {
@@ -472,8 +716,19 @@ export default function App() {
     scheduleClipboardClearIfUnchanged(value)
     setNotice({
       tone: "warning",
-      message: `${message} Clipboard remains readable by other apps until it is overwritten. sigyn will try to clear it in 60 seconds if unchanged.`,
+      message,
+      detail:
+        "Readable by other apps until overwritten. sigyn will try to clear it in 60 seconds if unchanged.",
     })
+  }
+
+  async function handleCopyEntryName(name: string) {
+    try {
+      await copyText(name)
+      setNotice({ tone: "success", message: `Copied ${name}.` })
+    } catch (caught) {
+      handleActionError(caught)
+    }
   }
 
   async function handleCopyEffectiveEnv(serialized?: string) {
@@ -528,6 +783,7 @@ export default function App() {
             {error ? <Banner tone="danger" message={error} /> : null}
           </section>
         </div>
+        <ToastViewport notice={notice} error={null} onDismiss={() => setNotice(null)} />
       </main>
     )
   }
@@ -538,7 +794,11 @@ export default function App() {
         <ProjectSidebar
           projects={snapshot.projects}
           activeProjectId={activeProject?.id ?? null}
-          onSelectProject={(projectId) => void applySnapshotAction(selectProject(projectId))}
+          onSelectProject={(projectId) => {
+            if (projectId !== activeProject?.id) {
+              requestPanelExit({ kind: "project", projectId })
+            }
+          }}
           showCliButton={Boolean(activeProject)}
           onShowCliDialog={() => setShowCliDialog(true)}
           onAddProject={() => setShowAddProject(true)}
@@ -589,26 +849,35 @@ export default function App() {
                         </button>
                       </div>
                     ) : (
-                      <div className="heading-row">
-                        <h1>{activeProject.name}</h1>
-                      </div>
+                      <h1>{activeProject.name}</h1>
                     )}
-                    <p className="muted">
-                      {activeProject.entries.length} entries · {activeProject.supported_environments.length}{" "}
-                      environments
-                    </p>
-                    {activeProject.working_directory && (
-                      <div className="metadata-list">
-                        <span className="metadata-chip">
-                          Working dir: {activeProject.working_directory}
-                        </span>
-                      </div>
-                    )}
+                    <div className="workspace__meta">
+                      <span>
+                        {activeProject.entries.length}{" "}
+                        {activeProject.entries.length === 1 ? "entry" : "entries"}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        {activeProject.supported_environments.length}{" "}
+                        {activeProject.supported_environments.length === 1 ? "env" : "envs"}
+                      </span>
+                      {activeProject.working_directory ? (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span
+                            className="workspace__meta-path"
+                            title={`Working directory: ${activeProject.working_directory}`}
+                          >
+                            {activeProject.working_directory}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="header-actions">
                     <button
-                      className="button button--ghost"
+                      className="button button--ghost button--sm"
                       disabled={busy}
                       onClick={() => {
                         setIsRenamingProject(false)
@@ -616,77 +885,116 @@ export default function App() {
                         setShowEditProject(true)
                       }}
                     >
-                      <Pencil size={16} />
-                      Edit Project
+                      <Pencil size={14} />
+                      Edit
                     </button>
                     <button
-                      className="button button--ghost"
+                      className="button button--ghost button--sm"
                       disabled={busy}
                       onClick={() => void handlePreview()}
                     >
+                      <FileText size={14} />
                       Preview
                     </button>
                     <button
-                      className="button button--primary"
+                      className="button button--primary button--sm"
                       disabled={busy}
                       onClick={() => void handleCopyEffectiveEnv()}
                     >
-                      <Copy size={16} />
-                      Copy
+                      <Copy size={14} />
+                      Copy env
                     </button>
-                    <button className="button button--danger" disabled={busy} onClick={handleLock}>
-                      <Shield size={16} />
-                      Lock Now
+                    <button
+                      className="button button--danger button--sm"
+                      disabled={busy}
+                      onClick={handleLock}
+                    >
+                      <Shield size={14} />
+                      Lock
                     </button>
                   </div>
                 </div>
 
-                <EnvironmentBar
+                <EnvironmentSwitcher
                   project={activeProject}
+                  statuses={entryStatuses}
                   disabled={busy}
                   onSelect={(environment) =>
-                    void applySnapshotAction(
-                      setBaseEnvironment(activeProject.id, environment),
-                    )
+                    void handleSelectBaseEnvironment(activeProject, environment)
                   }
                   onReset={() =>
-                    void applySnapshotAction(
-                      resetOverrides(activeProject.id),
-                      {
-                        tone: "success",
-                        message: "Overrides cleared.",
-                      },
-                    )
+                    void applySnapshotAction(resetOverrides(activeProject.id), {
+                      tone: "success",
+                      message: `All entries back on ${formatEnvironmentLabel(activeProject.active_base_environment)}.`,
+                    })
                   }
+                  onShowOverrides={() => setEntryFilter("overrides")}
                 />
 
                 <div className="toolbar">
-                  <div className="toolbar__search-group">
-                    <label className="search">
-                      <Search size={16} />
-                      <input
-                        value={searchQuery}
-                        placeholder="Search entries..."
-                        spellCheck={false}
-                        onChange={(event) => setSearchQuery(event.target.value)}
-                      />
-                    </label>
+                  <label className="search">
+                    <Search size={14} />
+                    <input
+                      ref={searchInputRef}
+                      value={searchQuery}
+                      placeholder="Search entries"
+                      spellCheck={false}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                    />
+                    {searchQuery ? (
+                      <button
+                        className="search__clear"
+                        onClick={() => {
+                          setSearchQuery("")
+                          searchInputRef.current?.focus()
+                        }}
+                        aria-label="Clear search"
+                      >
+                        <X size={12} />
+                      </button>
+                    ) : (
+                      <kbd className="search__hint">/</kbd>
+                    )}
+                  </label>
+
+                  <div className="filter-group" role="radiogroup" aria-label="Filter entries">
+                    <FilterChip
+                      label="All"
+                      count={entryCounts.all}
+                      active={entryFilter === "all"}
+                      onClick={() => setEntryFilter("all")}
+                    />
+                    <FilterChip
+                      label="Overridden"
+                      tone="warning"
+                      count={entryCounts.overrides}
+                      active={entryFilter === "overrides"}
+                      onClick={() => setEntryFilter("overrides")}
+                    />
+                    <FilterChip
+                      label="Missing"
+                      tone="danger"
+                      count={entryCounts.missing}
+                      active={entryFilter === "missing"}
+                      onClick={() => setEntryFilter("missing")}
+                    />
                   </div>
+
                   <div className="toolbar__actions">
                     <button
-                      className="button button--ghost"
+                      className="button button--ghost button--sm"
                       disabled={busy}
                       onClick={() => setShowImportEntries(true)}
                     >
-                      <Upload size={16} />
+                      <Upload size={14} />
                       Import
                     </button>
                     <button
-                      className="button button--primary"
+                      className="button button--primary button--sm"
                       disabled={busy}
                       onClick={() => setShowAddEntry(true)}
                     >
-                      <Plus size={16} />
+                      <Plus size={14} />
                       Add Entry
                     </button>
                   </div>
@@ -705,67 +1013,100 @@ export default function App() {
                 </button>
               </div>
             )}
-
-            {error ? <Banner tone="danger" message={error} /> : null}
-            {notice ? <Banner tone={notice.tone} message={notice.message} /> : null}
           </header>
 
-          <section className="workspace__content">
+          <section
+            className={`workspace__content ${selectedEntry ? "workspace__content--with-panel" : ""}`}
+          >
             {activeProject ? (
               <>
                 {filteredEntries.length > 0 ? (
-                  <div className="entry-list" role="table" aria-label="Secrets">
-                    <div className="entry-list__head" role="row">
-                      <span />
-                      <span>Name</span>
-                      <span>Meta</span>
-                      <span>Active</span>
-                      <span>Value</span>
-                    </div>
-                    {filteredEntries.map((entry) => (
-                      <EntryCard
-                        key={entry.id}
-                        project={activeProject}
-                        entry={entry}
-                        selectedEnvironment={getSelectedEnvironment(activeProject, entry.id)}
-                        onSelectEnvironment={(entryId, environment) =>
-                          applySnapshotAction(
-                            setEntryOverride(activeProject.id, entryId, environment),
-                            {
-                              tone: "success",
-                              message: environment
-                                ? `Using ${environment} for ${entry.name}.`
-                                : `Reset ${entry.name} to the base preset.`,
-                            },
-                          )
-                        }
-                        onSave={(input) =>
-                          applySnapshotAction(updateEntry(input), {
-                            tone: "success",
-                            message: `${entry.name} updated.`,
-                          })
-                        }
-                        onDelete={() =>
-                          setEntryDeleteTarget({
-                            projectId: activeProject.id,
-                            entryId: entry.id,
-                            entryName: entry.name,
-                          })
-                        }
-                        onCopySecret={(value) => copySensitiveText(value, "Copied secret value.")}
-                      />
-                    ))}
-                  </div>
+                  <EntryTable
+                    project={activeProject}
+                    entries={filteredEntries}
+                    statuses={entryStatuses}
+                    selectedEntryId={selectedEntry?.id ?? null}
+                    disabled={busy}
+                    onSelectEntry={(entryId) =>
+                      requestPanelExit({
+                        kind: "entry",
+                        entryId: entryId === selectedEntryId ? null : entryId,
+                      })
+                    }
+                    onSelectEnvironment={(entry, environment) =>
+                      void handleSelectEntryEnvironment(activeProject, entry, environment)
+                    }
+                  />
                 ) : (
                   <div className="empty-state">
-                    <h2>No matching entries</h2>
+                    <h2>
+                      {activeProject.entries.length === 0
+                        ? "No entries yet"
+                        : entryFilter === "overrides" && !searchQuery
+                          ? "No overridden entries"
+                          : entryFilter === "missing" && !searchQuery
+                            ? "No missing values"
+                            : "No matching entries"}
+                    </h2>
                     <p className="muted">
-                      {searchQuery
-                        ? "Try a different query or clear search."
-                        : "Add the first entry for this project to start composing runtime envs."}
+                      {activeProject.entries.length === 0
+                        ? "Add the first entry for this project to start composing runtime envs."
+                        : entryFilter === "overrides" && !searchQuery
+                          ? `Every entry resolves from ${formatEnvironmentLabel(activeProject.active_base_environment)}.`
+                          : entryFilter === "missing" && !searchQuery
+                            ? "Every entry has a value for the environment it resolves from."
+                            : "Try a different query or clear the filters."}
                     </p>
+                    {activeProject.entries.length > 0 && (entryFilter !== "all" || searchQuery) ? (
+                      <button
+                        className="button button--ghost button--sm"
+                        onClick={() => {
+                          setEntryFilter("all")
+                          setSearchQuery("")
+                        }}
+                      >
+                        Show all entries
+                      </button>
+                    ) : null}
                   </div>
                 )}
+
+                {selectedEntry ? (
+                  <EntryPanel
+                    key={selectedEntry.id}
+                    project={activeProject}
+                    entry={selectedEntry}
+                    status={entryStatuses[selectedEntry.id] ?? getEntryStatus(activeProject, selectedEntry)}
+                    pendingExit={Boolean(pendingPanelExit)}
+                    onConfirmExit={() => {
+                      if (pendingPanelExit) {
+                        performPanelExit(pendingPanelExit)
+                      }
+                    }}
+                    onCancelExit={() => setPendingPanelExit(null)}
+                    onDirtyChange={setPanelDirty}
+                    onClose={() => requestPanelExit({ kind: "entry", entryId: null })}
+                    onSelectEnvironment={(environment) =>
+                      handleSelectEntryEnvironment(activeProject, selectedEntry, environment)
+                    }
+                    onSave={(input) =>
+                      applySnapshotAction(updateEntry(input), {
+                        tone: "success",
+                        message: `${selectedEntry.name} saved.`,
+                      })
+                    }
+                    onDelete={() =>
+                      setEntryDeleteTarget({
+                        projectId: activeProject.id,
+                        entryId: selectedEntry.id,
+                        entryName: selectedEntry.name,
+                      })
+                    }
+                    onCopyName={() => void handleCopyEntryName(selectedEntry.name)}
+                    onCopySecret={(value) => copySensitiveText(value, "Copied secret value.")}
+                    onLoadError={handleActionError}
+                  />
+                ) : null}
               </>
             ) : null}
           </section>
@@ -874,6 +1215,15 @@ export default function App() {
         onClose={() => setEntryDeleteTarget(null)}
         onConfirm={() => void handleDeleteEntry()}
       />
+
+      <ToastViewport
+        notice={notice}
+        error={error}
+        onDismiss={() => {
+          setError(null)
+          setNotice(null)
+        }}
+      />
     </>
   )
 }
@@ -893,21 +1243,72 @@ function ProjectSidebar({
   onShowCliDialog: () => void
   onAddProject: () => void
 }) {
+  const [projectQuery, setProjectQuery] = useState("")
+  const normalizedQuery = projectQuery.trim().toLowerCase()
+  const visibleProjects = normalizedQuery
+    ? projects.filter((project) => project.name.toLowerCase().includes(normalizedQuery))
+    : projects
+
   return (
     <aside className="sidebar">
       <div className="sidebar__brand">
-        <img src={appIcon} alt="Sigyn" width={28} height={28} className="sidebar__icon" />
+        <img src={appIcon} alt="" width={22} height={22} className="sidebar__icon" />
         <div className="sidebar__title">Sigyn</div>
       </div>
 
-      <div className="sidebar__section-label">Projects</div>
+      <div className="sidebar__section">
+        <span className="sidebar__section-label">Projects</span>
+        <button
+          className="sidebar__add"
+          onClick={onAddProject}
+          aria-label="Add project"
+          title="Add project"
+        >
+          <Plus size={14} />
+        </button>
+      </div>
+
+      {projects.length > 0 ? (
+        <label className="sidebar__search">
+          <Search size={13} />
+          <input
+            value={projectQuery}
+            placeholder="Find project"
+            spellCheck={false}
+            aria-label="Find project"
+            onChange={(event) => setProjectQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && visibleProjects.length > 0) {
+                onSelectProject(visibleProjects[0].id)
+              }
+              if (event.key === "Escape" && projectQuery) {
+                event.preventDefault()
+                setProjectQuery("")
+              }
+            }}
+          />
+          {projectQuery ? (
+            <button
+              className="sidebar__search-clear"
+              onClick={() => setProjectQuery("")}
+              aria-label="Clear project search"
+            >
+              <X size={12} />
+            </button>
+          ) : null}
+        </label>
+      ) : null}
 
       <nav className="sidebar__nav">
+        {projects.length > 0 && visibleProjects.length === 0 ? (
+          <div className="sidebar__no-match">No projects match “{projectQuery.trim()}”</div>
+        ) : null}
         {projects.length > 0 ? (
-          projects.map((project) => (
+          visibleProjects.map((project) => (
             <button
               key={project.id}
               className={`project-link ${project.id === activeProjectId ? "project-link--active" : ""}`}
+              aria-current={project.id === activeProjectId ? "page" : undefined}
               onClick={() => onSelectProject(project.id)}
             >
               <span className="project-link__name">{project.name}</span>
@@ -915,24 +1316,19 @@ function ProjectSidebar({
             </button>
           ))
         ) : (
-          <div className="sidebar__empty">No projects saved yet.</div>
+          <button className="sidebar__empty" onClick={onAddProject}>
+            <Plus size={14} />
+            Add your first project
+          </button>
         )}
       </nav>
 
-      <div className="sidebar__footer">
-        <div className="sidebar__footer-actions">
-          {showCliButton ? (
-            <button className="button button--ghost button--full" onClick={onShowCliDialog}>
-              <Terminal size={16} />
-              Companion CLI
-            </button>
-          ) : null}
-          <button className="button button--ghost button--full" onClick={onAddProject}>
-            <Plus size={16} />
-            Add Project
-          </button>
-        </div>
-      </div>
+      {showCliButton ? (
+        <button className="sidebar__footer-link" onClick={onShowCliDialog}>
+          <Terminal size={14} />
+          Companion CLI
+        </button>
+      ) : null}
     </aside>
   )
 }
@@ -970,149 +1366,427 @@ function CliDialog({
   )
 }
 
-function EnvironmentBar({
+function EnvironmentSwitcher({
   project,
+  statuses,
   disabled,
   onSelect,
   onReset,
+  onShowOverrides,
 }: {
   project: ProjectRecord
+  statuses: Record<string, EntryStatus>
   disabled: boolean
   onSelect: (environment: string) => void
   onReset: () => void
+  onShowOverrides: () => void
 }) {
-  const overrideCount = Object.keys(project.entry_overrides).length
-
-  const activationCounts = useMemo(() => {
-    const counts = Object.fromEntries(
-      project.supported_environments.map((environment) => [environment, 0]),
-    ) as Record<string, number>
-
-    for (const entry of project.entries) {
-      const env = getSelectedEnvironment(project, entry.id)
-      counts[env] = (counts[env] ?? 0) + 1
+  const usageCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const status of Object.values(statuses)) {
+      counts[status.environment] = (counts[status.environment] ?? 0) + 1
     }
-
     return counts
-  }, [project])
+  }, [statuses])
 
-  const hasForeignActivations = project.supported_environments.some(
-    (env) => env !== project.active_base_environment && (activationCounts[env] ?? 0) > 0,
-  )
+  const overrideCount = Object.values(statuses).filter((status) => status.overridden).length
+  const baseLabel = formatEnvironmentLabel(project.active_base_environment)
 
   return (
-    <div className={`env-bar ${hasForeignActivations ? "env-bar--mixed" : ""}`}>
-      <div className="env-stack">
-        {project.supported_environments.map((env) => {
-          const activeCount = activationCounts[env] ?? 0
-          const isPrimary = env === project.active_base_environment
-          const isForeignActive = !isPrimary && activeCount > 0
+    <div className="env-switch">
+      <span className="env-switch__label">Default env</span>
+      <div className="env-switch__segments" role="radiogroup" aria-label="Default environment">
+        {project.supported_environments.map((environment) => {
+          const isDefault = environment === project.active_base_environment
+          const count = usageCounts[environment] ?? 0
+          const isForeign = !isDefault && count > 0
 
           return (
             <button
-              key={env}
-              className={`env-stack-card ${isPrimary ? "env-stack-card--active" : ""} ${
-                isForeignActive ? "env-stack-card--warning" : ""
+              key={environment}
+              role="radio"
+              aria-checked={isDefault}
+              className={`env-switch__segment ${isDefault ? "env-switch__segment--active" : ""} ${
+                isForeign ? "env-switch__segment--foreign" : ""
               }`}
               disabled={disabled}
-              onClick={() => onSelect(env)}
+              title={
+                isDefault
+                  ? `${count} entr${count === 1 ? "y resolves" : "ies resolve"} from ${formatEnvironmentLabel(environment)}`
+                  : isForeign
+                    ? `${count} entr${count === 1 ? "y is" : "ies are"} overridden to ${formatEnvironmentLabel(environment)}. Making it the default clears all overrides.`
+                    : `Make ${formatEnvironmentLabel(environment)} the default`
+              }
+              onClick={() => onSelect(environment)}
             >
-              <span className="env-stack-card__name">{formatEnvironmentLabel(env)}</span>
-              {activeCount > 0 ? (
-                <>
-                  <span className="env-stack-card__divider" aria-hidden="true" />
-                  <span className="env-stack-card__count">
-                    <span className="env-stack-card__count-dot" aria-hidden="true" />
-                    {activeCount}
-                  </span>
-                </>
-              ) : null}
+              <span>{formatEnvironmentLabel(environment)}</span>
+              {count > 0 ? <span className="env-switch__count">{count}</span> : null}
             </button>
           )
         })}
       </div>
 
-      {overrideCount > 0 && (
-        <button
-          className="button button--ghost env-bar__reset"
-          disabled={disabled}
-          onClick={onReset}
-          aria-label={`Reset to ${formatEnvironmentLabel(project.active_base_environment)}`}
-        >
-          <RotateCcw size={14} />
-          Reset
-        </button>
-      )}
+      <div className="env-switch__status" aria-live="polite">
+        {overrideCount > 0 ? (
+          <>
+            <button
+              className="env-switch__override-link"
+              onClick={onShowOverrides}
+              title="Show overridden entries"
+            >
+              <GitBranch size={12} />
+              {overrideCount} override{overrideCount === 1 ? "" : "s"}
+            </button>
+            <button
+              className="env-switch__reset"
+              disabled={disabled}
+              onClick={onReset}
+              title={`Point every entry back at ${baseLabel}`}
+            >
+              <RotateCcw size={12} />
+              Reset
+            </button>
+          </>
+        ) : (
+          <span className="env-switch__clean">
+            <Check size={12} />
+            All entries on {baseLabel}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
 
-function EntryCard({
+function FilterChip({
+  label,
+  count,
+  active,
+  tone,
+  onClick,
+}: {
+  label: string
+  count: number
+  active: boolean
+  tone?: "warning" | "danger"
+  onClick: () => void
+}) {
+  return (
+    <button
+      role="radio"
+      aria-checked={active}
+      className={`filter-chip ${active ? "filter-chip--active" : ""} ${
+        tone && count > 0 ? `filter-chip--${tone}` : ""
+      }`}
+      onClick={onClick}
+    >
+      {label}
+      <span className="filter-chip__count">{count}</span>
+    </button>
+  )
+}
+
+function EntryTable({
+  project,
+  entries,
+  statuses,
+  selectedEntryId,
+  disabled,
+  onSelectEntry,
+  onSelectEnvironment,
+}: {
+  project: ProjectRecord
+  entries: EntryRecord[]
+  statuses: Record<string, EntryStatus>
+  selectedEntryId: string | null
+  disabled: boolean
+  onSelectEntry: (entryId: string) => void
+  onSelectEnvironment: (entry: EntryRecord, environment: string) => void
+}) {
+  const abbreviations = useMemo(
+    () => abbreviateEnvironments(project.supported_environments),
+    [project.supported_environments],
+  )
+  const tableStyle = {
+    "--env-count": project.supported_environments.length,
+  } as CSSProperties
+
+  return (
+    <div className="entry-table" role="table" aria-label="Entries" style={tableStyle}>
+      <div className="entry-table__head" role="row">
+        <span role="columnheader">Name</span>
+        <span role="columnheader" className="entry-table__notes-head">
+          Description
+        </span>
+        <span role="columnheader" className="env-matrix env-matrix--head">
+          {project.supported_environments.map((environment) => (
+            <span
+              key={environment}
+              className={`env-matrix__label ${
+                environment === project.active_base_environment ? "env-matrix__label--default" : ""
+              }`}
+              title={
+                environment === project.active_base_environment
+                  ? `${formatEnvironmentLabel(environment)} (default)`
+                  : formatEnvironmentLabel(environment)
+              }
+            >
+              {abbreviations[environment]}
+            </span>
+          ))}
+        </span>
+      </div>
+
+      {entries.map((entry) => (
+        <EntryRow
+          key={entry.id}
+          project={project}
+          entry={entry}
+          status={statuses[entry.id] ?? getEntryStatus(project, entry)}
+          selected={entry.id === selectedEntryId}
+          disabled={disabled}
+          onSelect={() => onSelectEntry(entry.id)}
+          onSelectEnvironment={(environment) => onSelectEnvironment(entry, environment)}
+        />
+      ))}
+    </div>
+  )
+}
+
+function EntryRow({
   project,
   entry,
-  selectedEnvironment,
+  status,
+  selected,
+  disabled,
+  onSelect,
   onSelectEnvironment,
-  onSave,
-  onDelete,
-  onCopySecret,
 }: {
   project: ProjectRecord
   entry: EntryRecord
-  selectedEnvironment: string
-  onSelectEnvironment: (entryId: string, environment: string | null) => Promise<unknown>
-  onSave: (input: UpdateEntryInput) => Promise<unknown>
-  onDelete: () => void
-  onCopySecret: (value: string) => Promise<void>
+  status: EntryStatus
+  selected: boolean
+  disabled: boolean
+  onSelect: () => void
+  onSelectEnvironment: (environment: string) => void
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const rowRef = useRef<HTMLDivElement>(null)
+  const valueEnvironments = useMemo(
+    () => new Set(entry.values.map((value) => value.environment)),
+    [entry.values],
+  )
+
+  useEffect(() => {
+    if (!selected || !rowRef.current) {
+      return
+    }
+    rowRef.current.scrollIntoView({ block: "nearest" })
+    const focused = document.activeElement
+    if (!focused || focused === document.body || focused.classList.contains("entry-row")) {
+      rowRef.current.focus({ preventScroll: true })
+    }
+  }, [selected])
+
+  return (
+    <div
+      ref={rowRef}
+      role="row"
+      tabIndex={0}
+      aria-selected={selected}
+      className={`entry-row ${selected ? "entry-row--selected" : ""} ${
+        status.overridden ? "entry-row--override" : ""
+      } ${status.missing ? "entry-row--missing" : ""}`}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) {
+          return
+        }
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          onSelect()
+        }
+      }}
+    >
+      <div role="cell" className="entry-row__name">
+        <span className="mono" title={describeEntryStatus(project, entry, status)}>
+          {entry.name}
+        </span>
+      </div>
+
+      <div role="cell" className="entry-row__notes">
+        {entry.category ? <span className="category-tag">{entry.category}</span> : null}
+        {entry.description ? (
+          <span className="entry-row__description" title={entry.description}>
+            {entry.description}
+          </span>
+        ) : null}
+      </div>
+
+      <div role="cell" className="env-matrix">
+        {project.supported_environments.map((environment) => {
+          const hasValue = valueEnvironments.has(environment)
+          const isActive = environment === status.environment
+          const label = formatEnvironmentLabel(environment)
+          const stateClass = isActive
+            ? status.missing
+              ? "env-cell--active-missing"
+              : status.overridden
+                ? "env-cell--active-override"
+                : "env-cell--active"
+            : ""
+
+          return (
+            <button
+              key={environment}
+              className={`env-cell ${hasValue ? "env-cell--set" : "env-cell--empty"} ${stateClass}`}
+              disabled={disabled}
+              aria-pressed={isActive}
+              aria-label={`${label}: ${hasValue ? "value set" : "no value"}${
+                isActive ? ", in use" : `. Use ${label} for ${entry.name}`
+              }`}
+              title={`${label} · ${hasValue ? "value set" : "no value"}${
+                isActive ? " · in use" : " · click to use"
+              }`}
+              onClick={(event) => {
+                event.stopPropagation()
+                if (!isActive) {
+                  onSelectEnvironment(environment)
+                }
+              }}
+            >
+              <span className="env-cell__mark" aria-hidden="true" />
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function EntryPanel({
+  project,
+  entry,
+  status,
+  pendingExit,
+  onConfirmExit,
+  onCancelExit,
+  onDirtyChange,
+  onClose,
+  onSelectEnvironment,
+  onSave,
+  onDelete,
+  onCopyName,
+  onCopySecret,
+  onLoadError,
+}: {
+  project: ProjectRecord
+  entry: EntryRecord
+  status: EntryStatus
+  pendingExit: boolean
+  onConfirmExit: () => void
+  onCancelExit: () => void
+  onDirtyChange: (dirty: boolean) => void
+  onClose: () => void
+  onSelectEnvironment: (environment: string) => Promise<boolean>
+  onSave: (input: UpdateEntryInput) => Promise<boolean>
+  onDelete: () => void
+  onCopyName: () => void
+  onCopySecret: (value: string) => Promise<void>
+  onLoadError: (caught: unknown) => void
+}) {
   const [saving, setSaving] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
   const [valuesLoaded, setValuesLoaded] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [draftName, setDraftName] = useState(entry.name)
   const [draftCategory, setDraftCategory] = useState(entry.category ?? "")
   const [draftDescription, setDraftDescription] = useState(entry.description ?? "")
   const [draftValues, setDraftValues] = useState<Record<string, ValueDraft>>(() =>
     buildEntryDraftValues(project, entry),
   )
+  const [baselineValues, setBaselineValues] = useState<Record<string, ValueDraft>>(() =>
+    buildEntryDraftValues(project, entry),
+  )
   const [revealed, setRevealed] = useState<Record<string, boolean>>({})
   const [valueFocused, setValueFocused] = useState<Record<string, boolean>>({})
+  const dirtyRef = useRef(false)
+  const syncedSignatureRef = useRef(getEntrySignature(entry))
+
+  const signature = getEntrySignature(entry)
+  const metaDirty =
+    draftName !== entry.name ||
+    draftCategory !== (entry.category ?? "") ||
+    draftDescription !== (entry.description ?? "")
+  const valuesDirty =
+    valuesLoaded &&
+    project.supported_environments.some((environment) => {
+      const draft = draftValues[environment] ?? EMPTY_VALUE_DRAFT
+      const baseline = baselineValues[environment] ?? EMPTY_VALUE_DRAFT
+      return draft.present !== baseline.present || (draft.present && draft.value !== baseline.value)
+    })
+  const dirty = metaDirty || valuesDirty
 
   useEffect(() => {
+    let cancelled = false
+    const initial = buildEntryDraftValues(project, entry)
+    syncedSignatureRef.current = getEntrySignature(entry)
     setDraftName(entry.name)
     setDraftCategory(entry.category ?? "")
     setDraftDescription(entry.description ?? "")
-    setDraftValues(buildEntryDraftValues(project, entry))
+    setDraftValues(initial)
+    setBaselineValues(initial)
     setRevealed({})
     setValuesLoaded(false)
-  }, [entry, project])
+    setLoadFailed(false)
+
+    getEntryValues(project.id, entry.id)
+      .then((result) => {
+        if (cancelled) {
+          return
+        }
+        const loaded = { ...initial }
+        for (const item of result.values) {
+          loaded[item.environment] = { present: true, value: item.value }
+        }
+        setDraftValues(loaded)
+        setBaselineValues(loaded)
+        setValuesLoaded(true)
+      })
+      .catch((caught) => {
+        if (cancelled) {
+          return
+        }
+        setLoadFailed(true)
+        onLoadError(caught)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [reloadToken])
 
   useEffect(() => {
-    if (expanded && !valuesLoaded) {
-      void loadValues()
-    }
-  }, [expanded, valuesLoaded])
+    dirtyRef.current = dirty
+    onDirtyChange(dirty)
+  }, [dirty])
 
-  const hasActiveValue = entry.values.some((v) => v.environment === selectedEnvironment)
+  useEffect(() => () => onDirtyChange(false), [])
 
-  async function loadValues() {
-    try {
-      const result = await getEntryValues(project.id, entry.id)
-      setDraftValues((current) => {
-        const next = { ...current }
-        for (const item of result.values) {
-          next[item.environment] = { present: true, value: item.value }
-        }
-        return next
-      })
-      setValuesLoaded(true)
-    } catch {
-      // will retry on next effect cycle
+  useEffect(() => {
+    // Pick up external edits (CLI, import) when there is nothing local to lose.
+    if (signature !== syncedSignatureRef.current && !dirtyRef.current) {
+      setReloadToken((current) => current + 1)
     }
-  }
+  }, [signature])
 
   async function handleSave() {
+    if (!dirty || saving || !valuesLoaded) {
+      return
+    }
+
     setSaving(true)
     try {
-      await onSave({
+      const saved = await onSave({
         project_id: project.id,
         entry_id: entry.id,
         name: draftName,
@@ -1124,70 +1798,260 @@ function EntryCard({
           value: draftValues[environment]?.value ?? "",
         })),
       })
+      if (saved) {
+        setReloadToken((current) => current + 1)
+      }
     } finally {
       setSaving(false)
     }
   }
 
+  function handleDiscard() {
+    setDraftName(entry.name)
+    setDraftCategory(entry.category ?? "")
+    setDraftDescription(entry.description ?? "")
+    setDraftValues(baselineValues)
+    setRevealed({})
+  }
+
+  const activeLabel = formatEnvironmentLabel(status.environment)
+  const baseLabel = formatEnvironmentLabel(project.active_base_environment)
+
   return (
-    <article className={`entry-card ${expanded ? "entry-card--expanded" : ""}`} role="rowgroup">
-      <div className="entry-card__summary" role="row">
-        <button
-          className="icon-button entry-card__expand"
-          onClick={() => setExpanded((current) => !current)}
-          aria-label={expanded ? "Collapse entry" : "Expand entry"}
-        >
-          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        </button>
-
-        <div className="entry-card__identity" role="cell">
-          <div className="entry-card__name-row">
-            <span className="mono">{entry.name}</span>
-            <span className={`status-dot ${hasActiveValue ? "status-dot--ok" : "status-dot--missing"}`} />
-          </div>
-        </div>
-
-        <div className="entry-card__meta" role="cell">
+    <aside
+      className="entry-panel"
+      aria-label={`${entry.name} details`}
+      onKeyDown={(event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+          event.preventDefault()
+          void handleSave()
+        }
+      }}
+    >
+      <header className="entry-panel__header">
+        <div className="entry-panel__title">
+          <h2 className="mono" title={entry.name}>
+            {entry.name}
+          </h2>
           {entry.category || entry.description ? (
-            [entry.category, entry.description].filter(Boolean).join(" · ")
-          ) : (
-            <span className="muted">-</span>
-          )}
+            <p className="entry-panel__subtitle">
+              {entry.category ? <span className="category-tag">{entry.category}</span> : null}
+              {entry.description ? <span>{entry.description}</span> : null}
+            </p>
+          ) : null}
         </div>
-
-        <label className="entry-card__select" role="cell">
-          <span className="muted muted--small">Active</span>
-          <select
-            value={selectedEnvironment}
-            onChange={(event) =>
-              void onSelectEnvironment(
-                entry.id,
-                event.target.value === project.active_base_environment ? null : event.target.value,
-              )
-            }
+        <div className="entry-panel__header-actions">
+          <button
+            className="icon-button icon-button--sm"
+            onClick={onCopyName}
+            aria-label="Copy name"
+            title="Copy name"
           >
-            {project.supported_environments.map((environment) => (
-              <option key={environment} value={environment}>
-                {formatEnvironmentLabel(environment)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="entry-card__masked" role="cell">
-          {hasActiveValue ? "••••••••" : <span className="danger">not set</span>}
+            <Copy size={14} />
+          </button>
+          <button
+            className="icon-button icon-button--sm"
+            onClick={onClose}
+            aria-label="Close panel"
+            title="Close (Esc)"
+          >
+            <X size={14} />
+          </button>
         </div>
+      </header>
+
+      <div
+        className={`source-callout ${
+          status.missing
+            ? "source-callout--missing"
+            : status.overridden
+              ? "source-callout--override"
+              : ""
+        }`}
+      >
+        {status.missing ? <AlertTriangle size={14} /> : status.overridden ? <GitBranch size={14} /> : <Check size={14} />}
+        <span className="source-callout__text">
+          {status.missing ? (
+            <>
+              No value for <strong>{activeLabel}</strong>. This entry is skipped when the env is
+              resolved.
+            </>
+          ) : status.overridden ? (
+            <>
+              Overridden to <strong>{activeLabel}</strong> instead of the default{" "}
+              <strong>{baseLabel}</strong>.
+            </>
+          ) : (
+            <>
+              Resolves from <strong>{activeLabel}</strong>, the project default.
+            </>
+          )}
+        </span>
+        {status.overridden ? (
+          <button
+            className="source-callout__action"
+            disabled={saving}
+            onClick={() => void onSelectEnvironment(project.active_base_environment)}
+          >
+            Use {baseLabel}
+          </button>
+        ) : null}
       </div>
 
-      {expanded ? (
-        <div className="entry-card__details">
-          <div className="entry-card__fields">
+      {pendingExit ? (
+        <div className="entry-panel__confirm" role="alert">
+          <span>Discard unsaved changes to {entry.name}?</span>
+          <div className="entry-panel__confirm-actions">
+            <button className="button button--ghost button--xs" onClick={onCancelExit}>
+              Keep editing
+            </button>
+            <button className="button button--danger button--xs" onClick={onConfirmExit}>
+              Discard
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="entry-panel__body">
+        <section className="entry-panel__section">
+          <div className="panel-section-label">
+            <span>Values</span>
+            <span className="panel-section-label__hint">select which one this entry uses</span>
+          </div>
+          <div className="panel-values" role="radiogroup" aria-label={`Source for ${entry.name}`}>
+            {project.supported_environments.map((environment) => {
+              const draft = draftValues[environment] ?? EMPTY_VALUE_DRAFT
+              const isActive = status.environment === environment
+              const isDefault = environment === project.active_base_environment
+              const isMasked = draft.present && !revealed[environment]
+
+              return (
+                <div
+                  key={environment}
+                  className={`panel-value ${isActive ? "panel-value--active" : ""} ${
+                    isActive && status.overridden ? "panel-value--override" : ""
+                  } ${isActive && !draft.present ? "panel-value--missing" : ""}`}
+                >
+                  <button
+                    role="radio"
+                    aria-checked={isActive}
+                    className="panel-value__source"
+                    disabled={saving}
+                    title={isActive ? "In use" : `Use ${formatEnvironmentLabel(environment)}`}
+                    onClick={() => void onSelectEnvironment(environment)}
+                  >
+                    <span className="panel-value__radio" aria-hidden="true" />
+                    <span className="panel-value__env">{formatEnvironmentLabel(environment)}</span>
+                    {isDefault ? <span className="panel-value__default">default</span> : null}
+                  </button>
+
+                  <input
+                    className={`panel-value__input ${isMasked ? "panel-value__input--masked" : ""}`}
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-label={`${formatEnvironmentLabel(environment)} value`}
+                    disabled={saving || !valuesLoaded}
+                    readOnly={isMasked}
+                    value={
+                      isMasked
+                        ? OBSCURED_SECRET_MASK
+                        : valueFocused[environment]
+                          ? draft.value
+                          : displayWhitespace(draft.value)
+                    }
+                    placeholder={
+                      !valuesLoaded ? (loadFailed ? "failed to load" : "loading…") : "not set"
+                    }
+                    onFocus={(event) => {
+                      setValueFocused((current) => ({ ...current, [environment]: true }))
+                      if (isMasked) {
+                        setRevealed((current) => ({ ...current, [environment]: true }))
+                        // The click landed on the mask, so put the caret at the end of the real value.
+                        const input = event.currentTarget
+                        requestAnimationFrame(() => {
+                          input.setSelectionRange(input.value.length, input.value.length)
+                        })
+                      }
+                    }}
+                    onBlur={() => {
+                      setValueFocused((current) => ({ ...current, [environment]: false }))
+                    }}
+                    onChange={(event) => {
+                      setDraftValues((current) => ({
+                        ...current,
+                        [environment]: { present: true, value: event.target.value },
+                      }))
+                      setRevealed((current) => ({ ...current, [environment]: true }))
+                    }}
+                  />
+
+                  <div className="panel-value__actions">
+                    <button
+                      className="icon-button icon-button--xs"
+                      disabled={!draft.present || saving || !valuesLoaded}
+                      onClick={() =>
+                        setRevealed((current) => ({
+                          ...current,
+                          [environment]: !current[environment],
+                        }))
+                      }
+                      aria-label={revealed[environment] ? "Hide value" : "Reveal value"}
+                      title={revealed[environment] ? "Hide" : "Reveal"}
+                    >
+                      {revealed[environment] ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </button>
+                    <button
+                      className="icon-button icon-button--xs"
+                      disabled={!draft.present || saving || !valuesLoaded}
+                      onClick={() => void onCopySecret(draft.value)}
+                      aria-label="Copy value"
+                      title="Copy value"
+                    >
+                      <Copy size={13} />
+                    </button>
+                    <button
+                      className="icon-button icon-button--xs"
+                      disabled={!draft.present || saving || !valuesLoaded}
+                      onClick={() =>
+                        setDraftValues((current) => ({
+                          ...current,
+                          [environment]: { present: false, value: "" },
+                        }))
+                      }
+                      aria-label="Remove value"
+                      title="Remove value"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {loadFailed ? (
+            <button
+              className="button button--ghost button--xs entry-panel__retry"
+              onClick={() => setReloadToken((current) => current + 1)}
+            >
+              <RotateCcw size={12} />
+              Retry loading values
+            </button>
+          ) : null}
+        </section>
+
+        <section className="entry-panel__section">
+          <div className="panel-section-label">
+            <span>Details</span>
+          </div>
+          <div className="entry-panel__fields">
             <label>
               <span>Name</span>
               <input
                 className="input"
                 value={draftName}
                 disabled={saving}
+                spellCheck={false}
                 onChange={(event) => setDraftName(event.target.value)}
               />
             </label>
@@ -1202,8 +2066,7 @@ function EntryCard({
               />
             </label>
           </div>
-
-          <label className="entry-card__textarea-label">
+          <label>
             <span>Description</span>
             <textarea
               className="textarea"
@@ -1213,141 +2076,39 @@ function EntryCard({
               onChange={(event) => setDraftDescription(event.target.value)}
             />
           </label>
+        </section>
+      </div>
 
-          <div className="env-value-section-label">ENVIRONMENT VALUES</div>
-          <div className="env-value-list">
-            {project.supported_environments.map((environment) => {
-              const draft = draftValues[environment] ?? { present: false, value: "" }
-              const isActive = selectedEnvironment === environment
-              const canUseBase = environment === project.active_base_environment
-              const isMasked = draft.present && !revealed[environment]
-
-              return (
-                <div
-                  key={environment}
-                  className={`env-value-row ${isActive ? "env-value-row--active" : ""}`}
-                >
-                  <button
-                    className="env-value-row__label"
-                    disabled={saving}
-                    onClick={() =>
-                      void onSelectEnvironment(entry.id, canUseBase ? null : environment)
-                    }
-                  >
-                    <span
-                      className={`status-dot ${draft.present ? "status-dot--ok" : "status-dot--missing"}`}
-                    />
-                    {isActive ? (
-                      <span className="env-value-row__chip">
-                        {formatEnvironmentLabel(environment)}
-                      </span>
-                    ) : (
-                      <span className="env-value-row__name">
-                        {formatEnvironmentLabel(environment)}
-                      </span>
-                    )}
-                  </button>
-
-                  <input
-                    className={`env-value-row__input ${
-                      isMasked ? "env-value-row__input--masked" : ""
-                    }`}
-                    type="text"
-                    autoComplete="off"
-                    disabled={saving || !valuesLoaded}
-                    readOnly={isMasked}
-                    value={
-                      isMasked
-                        ? OBSCURED_SECRET_MASK
-                        : valueFocused[environment]
-                          ? draft.value
-                          : displayWhitespace(draft.value)
-                    }
-                    placeholder={draft.present ? "" : "not set"}
-                    onFocus={() => {
-                      setValueFocused((current) => ({ ...current, [environment]: true }))
-                      if (!isMasked) {
-                        return
-                      }
-
-                      setRevealed((current) => ({
-                        ...current,
-                        [environment]: true,
-                      }))
-                    }}
-                    onBlur={() => {
-                      setValueFocused((current) => ({ ...current, [environment]: false }))
-                    }}
-                    onChange={(event) =>
-                      {
-                        setDraftValues((current) => ({
-                          ...current,
-                          [environment]: {
-                            present: true,
-                            value: event.target.value,
-                          },
-                        }))
-                        setRevealed((current) => ({
-                          ...current,
-                          [environment]: true,
-                        }))
-                      }
-                    }
-                  />
-
-                  <div className="env-value-row__actions">
-                    <button
-                      className="icon-button icon-button--sm"
-                      disabled={!draft.present || saving || !valuesLoaded}
-                      onClick={() =>
-                        setRevealed((current) => ({
-                          ...current,
-                          [environment]: !current[environment],
-                        }))
-                      }
-                      aria-label={revealed[environment] ? "Hide" : "Reveal"}
-                    >
-                      {revealed[environment] ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                    <button
-                      className="icon-button icon-button--sm"
-                      disabled={!draft.present || saving || !valuesLoaded}
-                      onClick={() => void onCopySecret(draft.value)}
-                      aria-label="Copy value"
-                    >
-                      <Copy size={14} />
-                    </button>
-                    <button
-                      className="icon-button icon-button--sm"
-                      disabled={saving || !valuesLoaded}
-                      onClick={() =>
-                        setDraftValues((current) => ({
-                          ...current,
-                          [environment]: { present: false, value: "" },
-                        }))
-                      }
-                      aria-label="Remove value"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="entry-card__footer">
-            <button className="button button--danger" disabled={saving} onClick={onDelete}>
-              <Trash2 size={16} />
-              Delete Entry
-            </button>
-            <button className="button button--primary" disabled={saving || !valuesLoaded} onClick={() => void handleSave()}>
-              {saving ? "Saving..." : !valuesLoaded ? "Loading…" : "Save Changes"}
-            </button>
-          </div>
+      <footer className="entry-panel__footer">
+        <button
+          className="button button--danger button--xs"
+          disabled={saving}
+          onClick={onDelete}
+          title="Delete entry"
+        >
+          <Trash2 size={13} />
+          Delete
+        </button>
+        <div className="entry-panel__footer-main">
+          {dirty ? <span className="unsaved-pill">Unsaved</span> : null}
+          <button
+            className="button button--ghost button--xs"
+            disabled={!dirty || saving}
+            onClick={handleDiscard}
+          >
+            Discard
+          </button>
+          <button
+            className="button button--primary button--xs"
+            disabled={!dirty || saving || !valuesLoaded}
+            onClick={() => void handleSave()}
+            title="Save (⌘S)"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
         </div>
-      ) : null}
-    </article>
+      </footer>
+    </aside>
   )
 }
 
@@ -2094,6 +2855,101 @@ function Banner({
       <span>{message}</span>
     </div>
   )
+}
+
+function ToastViewport({
+  notice,
+  error,
+  onDismiss,
+}: {
+  notice: ToastNotice | null
+  error: string | null
+  onDismiss: () => void
+}) {
+  const toast = error
+    ? { key: `error:${error}`, tone: "danger" as const, message: error, detail: undefined }
+    : notice
+      ? { key: `notice:${notice.id}`, tone: notice.tone, message: notice.message, detail: notice.detail }
+      : null
+
+  return (
+    <div className="toast-viewport" aria-live={error ? "assertive" : "polite"}>
+      {toast ? (
+        <div
+          key={toast.key}
+          className={`toast toast--${toast.tone}`}
+          role={toast.tone === "danger" ? "alert" : "status"}
+        >
+          <span className="toast__icon" aria-hidden="true">
+            {toast.tone === "warning" ? <AlertTriangle size={15} /> : null}
+            {toast.tone === "success" ? <Check size={15} /> : null}
+            {toast.tone === "danger" ? <X size={15} /> : null}
+          </span>
+          <div className="toast__text">
+            <span className="toast__message">{toast.message}</span>
+            {toast.detail ? <span className="toast__detail">{toast.detail}</span> : null}
+          </div>
+          <button className="toast__close" onClick={onDismiss} aria-label="Dismiss">
+            <X size={13} />
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function getEntryStatus(project: ProjectRecord, entry: EntryRecord): EntryStatus {
+  const environment = getSelectedEnvironment(project, entry.id)
+  return {
+    environment,
+    overridden: environment !== project.active_base_environment,
+    missing: !entry.values.some((value) => value.environment === environment),
+  }
+}
+
+function describeEntryStatus(project: ProjectRecord, entry: EntryRecord, status: EntryStatus) {
+  const label = formatEnvironmentLabel(status.environment)
+  if (status.missing) {
+    return `${entry.name}: no value for ${label}, so it is skipped`
+  }
+  if (status.overridden) {
+    return `${entry.name}: overridden to ${label} (default ${formatEnvironmentLabel(project.active_base_environment)})`
+  }
+  return entry.name
+}
+
+function getEntrySignature(entry: EntryRecord) {
+  return JSON.stringify([
+    entry.name,
+    entry.category,
+    entry.description,
+    entry.values.map((value) => value.environment),
+  ])
+}
+
+function abbreviateEnvironments(environments: string[]) {
+  const result: Record<string, string> = {}
+  const used = new Set<string>()
+
+  for (const environment of environments) {
+    const compact = environment.replace(/[^a-z0-9]/gi, "").toUpperCase() || environment.toUpperCase()
+    let abbreviation = ENV_ABBREVIATIONS[environment] ?? compact.slice(0, 3)
+    let length = 3
+    while (used.has(abbreviation) && length < Math.min(compact.length, 4)) {
+      length += 1
+      abbreviation = compact.slice(0, length)
+    }
+    let suffix = 2
+    const stem = abbreviation.slice(0, 3)
+    while (used.has(abbreviation)) {
+      abbreviation = `${stem}${suffix}`
+      suffix += 1
+    }
+    used.add(abbreviation)
+    result[environment] = abbreviation
+  }
+
+  return result
 }
 
 function buildEntryDraftValues(
