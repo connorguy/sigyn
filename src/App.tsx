@@ -973,7 +973,7 @@ export default function App() {
                     />
                     <FilterChip
                       label="Missing"
-                      tone="danger"
+                      tone="missing"
                       count={entryCounts.missing}
                       active={entryFilter === "missing"}
                       onClick={() => setEntryFilter("missing")}
@@ -1468,7 +1468,7 @@ function FilterChip({
   label: string
   count: number
   active: boolean
-  tone?: "warning" | "danger"
+  tone?: "warning" | "missing"
   onClick: () => void
 }) {
   return (
