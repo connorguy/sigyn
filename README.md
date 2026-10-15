@@ -4,6 +4,14 @@ Local-first macOS desktop app and companion CLI for managing project-specific en
 
 > **Status:** early-stage project. APIs, UX, and storage details may change before a stable public release.
 
+## Quick Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh | bash
+```
+
+This builds from source, so you need macOS, Node.js, Rust and the Xcode Command Line Tools. See [Install From Source](#install-from-source) for details and options.
+
 ## Overview
 
 sigyn is built for a single developer working locally on macOS. It keeps secret values encrypted at rest, lets you assemble an effective environment from saved presets and overrides, and can launch commands with injected variables without writing a plaintext `.env` file.
@@ -24,6 +32,7 @@ flowchart LR
 - mixed presets through per-entry overrides (base env + per-entry overrides from other envs)
 - preview and clipboard export of the effective env
 - CLI execution with injected environment variables
+- a built-in brief for AI coding agents (`sigyn --agent-skill`)
 - macOS device authentication before secret access
 
 ## Current Scope
@@ -36,7 +45,26 @@ flowchart LR
 
 ## Install From Source
 
-`install.sh` is the current install path for source builds. It installs the app into `/Applications` and symlinks the CLI into `~/.local/bin`. Running it again performs an update, overwriting the previous app, but does not overwrite any data.
+`install.sh` builds sigyn from source, installs the app into `/Applications`, and symlinks the CLI into `~/.local/bin`. Running it again performs an update, overwriting the previous app, but does not overwrite any data.
+
+One-line install (needs the prerequisites below):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh | bash
+```
+
+Run outside a checkout, the script fetches the source into `~/Library/Caches/sigyn/source`, then builds and installs from there. Re-run the same command to update. To review the script first, download it and run it yourself:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh -o install.sh
+less install.sh
+bash install.sh
+```
+
+Optional settings:
+
+- `SIGYN_REF`: branch or tag to install (default `main`), e.g. `curl -fsSL … | SIGYN_REF=<branch-or-tag> bash`
+- `SIGYN_SOURCE_DIR`: where to keep the source checkout
 
 Prerequisites:
 
@@ -46,9 +74,11 @@ Prerequisites:
 - Xcode or Command Line Tools
 - accepted Xcode license
 
-Run:
+From a clone:
 
 ```sh
+git clone https://github.com/connorguy/sigyn.git
+cd sigyn
 ./install.sh
 ```
 
@@ -180,6 +210,20 @@ Behavior:
 - injects env vars directly into the child process
 - does not write a `.env` file
 - inherits the parent shell environment and then adds or overrides project variables
+
+### Using sigyn with coding agents
+
+Set up the project and its variables in the app, then have your agent prepend `sigyn` to the commands that need them. To brief an agent, have it run:
+
+```sh
+sigyn --agent-skill
+```
+
+It prints a short guide: what sigyn is, that it should run `sigyn <command>` with no flags or subcommands, and that anything else (`--project`, `--env`, `--cwd`, `run`, `preview`, `list`, …) needs your explicit approval. Every `--help` screen ends with the same rule. To make it stick, add a line like this to your project's `AGENTS.md` or `CLAUDE.md`:
+
+```md
+This project's env vars come from sigyn. Run `sigyn --agent-skill` before running commands that need them.
+```
 
 For destructive local cleanup during development:
 

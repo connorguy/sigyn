@@ -245,6 +245,54 @@
       flex-wrap: wrap;
     }
 
+    .hero-install {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: min(760px, 100%);
+      margin: 28px auto 0;
+      padding: 6px 6px 6px 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: var(--shadow-card);
+      text-align: left;
+    }
+
+    .hero-install code {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow-x: auto;
+      white-space: nowrap;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+
+    .hero-install-prompt {
+      color: var(--accent);
+      font-weight: 600;
+      user-select: none;
+    }
+
+    .hero-install-copy {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .hero-install-copy:hover {
+      border-color: var(--accent-border-soft);
+      color: var(--accent);
+    }
+
     .btn {
       display: inline-flex;
       align-items: center;
@@ -761,9 +809,10 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 3px 10px;
+      padding: 2px 6px;
       border-radius: 6px;
       background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
     }
 
     @media (max-width: 768px) {
@@ -962,6 +1011,21 @@
       color: var(--text);
     }
 
+    .cli-example--wide {
+      grid-column: 1 / -1;
+    }
+
+    .cli-example-desc {
+      padding: 0 16px 16px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .cli-example-desc code {
+      font-family: var(--font-mono);
+      font-size: 0.82em;
+    }
+
     .cli-example .prompt { color: var(--accent); font-weight: 600; }
     .cli-example .flag { color: var(--success); }
     .cli-example .string { color: var(--accent-strong); }
@@ -1057,6 +1121,18 @@
       color: var(--text);
       overflow-x: auto;
       line-height: 1.7;
+    }
+
+    .install-step code.nowrap-code {
+      white-space: nowrap;
+    }
+
+    .install-step code.inline-code {
+      display: inline;
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      line-height: inherit;
     }
 
     .prereq-list {
@@ -1185,7 +1261,11 @@
         <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         View on GitHub
       </a>
-      <a href="#install" class="btn btn-secondary">Install from Source</a>
+      <a href="#install" class="btn btn-secondary">Install</a>
+    </div>
+    <div class="hero-install">
+      <code id="hero-install-cmd"><span class="hero-install-prompt">$</span> curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh | bash</code>
+      <button type="button" class="hero-install-copy" data-copy="curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh | bash">Copy</button>
     </div>
   </div>
 </header>
@@ -1197,7 +1277,29 @@
       <span class="mockup-menubar-left">
         <span>&#63743; Finder &nbsp;File &nbsp;Edit &nbsp;View</span>
       </span>
-      <span class="mockup-menubar-tray">&#x1f512; [big-service | local]</span>
+      <span class="mockup-menubar-tray" title="sigyn — big-service · local">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="16" height="16" aria-label="sigyn menu bar icon" role="img">
+        <defs>
+        <mask id="tray-key-gap" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+        <rect width="64" height="64" fill="#fff"/>
+        <g fill="#000" stroke="#000" stroke-width="4.5" stroke-linejoin="round">
+        <path d="M49 29 A9.5 9.5 0 1 1 48.99 29 Z M49 34.6 A3.4 3.4 0 1 0 49.01 34.6 Z"/>
+        <path d="M46.6 46 L51.4 46 L51.4 49.5 L55.5 49.5 L55.5 53.6 L51.4 53.6 L51.4 55.2 L54.5 55.2 L54.5 59.2 L51.4 59.2 Q51.4 61.5 49 61.5 Q46.6 61.5 46.6 59.2 Z"/>
+        </g>
+        </mask>
+        </defs>
+        <g fill="currentColor" transform="translate(1.25 -2.6)">
+        <g mask="url(#tray-key-gap)">
+        <circle cx="24" cy="19" r="11"/>
+        <path d="M3 57 C3 43.5 12 35 24 35 C36 35 45 43.5 45 57 Q45 59 43 59 L5 59 Q3 59 3 57 Z"/>
+        </g>
+        <g fill-rule="evenodd">
+        <path d="M49 29 A9.5 9.5 0 1 1 48.99 29 Z M49 34.6 A3.4 3.4 0 1 0 49.01 34.6 Z"/>
+        <path d="M46.6 46 L51.4 46 L51.4 49.5 L55.5 49.5 L55.5 53.6 L51.4 53.6 L51.4 55.2 L54.5 55.2 L54.5 59.2 L51.4 59.2 Q51.4 61.5 49 61.5 Q46.6 61.5 46.6 59.2 Z"/>
+        </g>
+        </g>
+        </svg>
+      </span>
       <span style="opacity: 0.5;">Wed 3:42 PM</span>
     </div>
     <div class="mockup-window">
@@ -1361,7 +1463,7 @@
       <div class="feature-card">
         <div class="feature-icon">&#x1f91a;</div>
         <h3>Touch ID Authentication</h3>
-        <p>One fingerprint. That's the whole auth flow. Falls back to your device password, but never asks you to invent yet another password.</p>
+        <p>One fingerprint. That's the whole auth flow. Falls back to your device password, but never asks you to invent yet another password. CLI prompts name exactly what's asking: project, environment, overrides, and the command.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">&#x1f4c1;</div>
@@ -1386,7 +1488,7 @@
       <div class="feature-card">
         <div class="feature-icon">&#x1f4cc;</div>
         <h3>Menu Bar Visibility</h3>
-        <p>Always-visible system tray shows your active project and environment at a glance. Switch projects, change environments, lock, or reset overrides without opening the window.</p>
+        <p>A quiet menu bar icon keeps your active project, environment, and overrides one click away. Switch projects, change environments, lock, or reset overrides without opening the window.</p>
       </div>
     </div>
   </div>
@@ -1475,6 +1577,11 @@
         <div class="cli-example-header">Reset (development only)</div>
         <pre><span class="prompt">$</span> sigyn reset-test-data <span class="flag">--confirm</span> <span class="string">"delete all data"</span></pre>
       </div>
+      <div class="cli-example cli-example--wide">
+        <div class="cli-example-header">For coding agents</div>
+        <pre><span class="prompt">$</span> sigyn <span class="flag">--agent-skill</span></pre>
+        <p class="cli-example-desc">Prints a short brief for your agent: you set up the env in the app, it just prepends <code>sigyn</code> to its commands, and anything beyond that (flags, <code>preview</code>, <code>run</code>, …) needs your say-so.</p>
+      </div>
     </div>
 
     <div class="cli-note">
@@ -1488,8 +1595,8 @@
 <section id="install">
   <div class="container">
     <div class="section-label">Install</div>
-    <h2 class="section-title">Clone, build, done</h2>
-    <p class="section-desc">One script handles the whole thing: builds the Tauri app, drops it in /Applications, and symlinks the CLI onto your PATH. Go grab coffee while Rust compiles.</p>
+    <h2 class="section-title">Paste, build, done</h2>
+    <p class="section-desc">One command handles the whole thing: fetches the source, builds the Tauri app, drops it in /Applications, and symlinks the CLI onto your PATH. Run it again to update. Go grab coffee while Rust compiles.</p>
 
     <div class="install-steps">
       <div class="install-step">
@@ -1505,9 +1612,9 @@
       </div>
       <div class="install-step">
         <div class="step-number">02</div>
-        <h3>Clone &amp; Install</h3>
-        <p>Three lines and a cup of patience:</p>
-        <code>git clone https://github.com/connorguy/sigyn.git<br>cd sigyn<br>./install.sh</code>
+        <h3>Install</h3>
+        <p>One line and a cup of patience. Prefer to read it first? Clone the repo and run <code class="inline-code">./install.sh</code>.</p>
+        <code class="nowrap-code">curl -fsSL https://raw.githubusercontent.com/connorguy/sigyn/main/install.sh | bash</code>
       </div>
       <div class="install-step">
         <div class="step-number">03</div>
@@ -1537,5 +1644,18 @@
   </div>
 </footer>
 
+<script>
+  document.querySelectorAll("[data-copy]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copy);
+        button.textContent = "Copied";
+      } catch {
+        button.textContent = "Select and copy";
+      }
+      setTimeout(() => { button.textContent = "Copy"; }, 1600);
+    });
+  });
+</script>
 </body>
 </html>

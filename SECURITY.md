@@ -198,7 +198,14 @@ If the macOS Keychain entry is lost (e.g., after a Keychain reset or migration t
 
 ### Clipboard Security
 
-When using the "Copy" button in the desktop app, decrypted secrets are placed on the system clipboard in plaintext. Any application with clipboard access can read them. sigyn does not clear the clipboard after a timeout.
+When you use "Copy env" or copy an individual value in the desktop app, decrypted secrets are placed on the system clipboard in plaintext. Any application with clipboard access can read them until they are overwritten.
+
+sigyn makes a best-effort attempt to clear them. About 60 seconds after a copy, the app reads the clipboard and, if it still holds exactly the copied text, replaces it with an empty string. This is not a guarantee:
+
+- It is skipped silently if the webview cannot read the clipboard (for example, the read is denied).
+- It leaves the clipboard alone if anything else was copied in the meantime.
+- It runs in the app window, so closing the window or quitting sigyn before the 60 seconds are up skips it. Locking does not cancel it.
+- It cannot recall copies already captured by clipboard managers or synced to other devices through Universal Clipboard.
 
 ### Side-Channel Attacks
 

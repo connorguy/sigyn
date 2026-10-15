@@ -30,6 +30,20 @@ const APP_ORGANIZATION: &str = "connorguy";
 const APP_NAME: &str = "sigyn";
 const DB_FILENAME: &str = "sigyn.sqlite3";
 const ACTIVE_PROJECT_KEY: &str = "active_project_id";
+const NO_ACTIVE_PROJECT_MESSAGE: &str =
+    "no active project selected — select a project in sigyn or pass --project";
+const MISSING_ACTIVE_PROJECT_MESSAGE: &str =
+    "the previously selected project no longer exists — select a project in sigyn or pass --project";
+
+/// Non-secret description of what a CLI invocation is about to resolve, read
+/// from metadata alone so it can be shown before the user authenticates.
+#[derive(Debug, Clone)]
+pub struct RunTargetSummary {
+    pub project_name: String,
+    pub base_environment: String,
+    pub environment_from_cli: bool,
+    pub override_count: usize,
+}
 
 struct ResolvedEffectiveEnvItem {
     entry_id: String,
@@ -626,12 +640,7 @@ impl Store {
         let conn = self.connection()?;
         let project_id = self
             .read_app_state(&conn, ACTIVE_PROJECT_KEY)?
-            .ok_or_else(|| {
-                AppError::Validation(
-                    "no active project selected — select a project in sigyn or pass --project"
-                        .into(),
-                )
-            })?;
+            .ok_or_else(|| AppError::Validation(NO_ACTIVE_PROJECT_MESSAGE.into()))?;
 
         let (name, working_directory): (String, Option<String>) = conn
             .query_row(
@@ -640,12 +649,7 @@ impl Store {
                 |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
             )
             .optional()?
-            .ok_or_else(|| {
-                AppError::Validation(
-                    "the previously selected project no longer exists — select a project in sigyn or pass --project"
-                        .into(),
-                )
-            })?;
+            .ok_or_else(|| AppError::Validation(MISSING_ACTIVE_PROJECT_MESSAGE.into()))?;
 
         let ResolvedPreview {
             serialized, items, ..
@@ -655,6 +659,66 @@ impl Store {
             .map(|item| (item.entry_name, item.value))
             .collect();
         Ok((name, working_directory, serialized, env_vars))
+    }
+
+    pub fn describe_run_target(
+        &self,
+        project_name: Option<&str>,
+        environment: Option<&str>,
+    ) -> Result<RunTargetSummary, AppError> {
+        let conn = self.connection()?;
+        let select = "SELECT id, name, base_environment, supported_environments FROM projects";
+        let read_row = |row: &rusqlite::Row<'_>| -> rusqlite::Result<(String, String, String, String)> {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        };
+
+        let (project_id, name, saved_base_environment, supported_environments) = match project_name
+        {
+            Some(project_name) => conn
+                .query_row(
+                    &format!("{select} WHERE name COLLATE NOCASE = ?1"),
+                    params![project_name],
+                    read_row,
+                )
+                .optional()?
+                .ok_or_else(|| AppError::NotFound(format!("project `{project_name}` not found")))?,
+            None => {
+                let project_id = self
+                    .read_app_state(&conn, ACTIVE_PROJECT_KEY)?
+                    .ok_or_else(|| AppError::Validation(NO_ACTIVE_PROJECT_MESSAGE.into()))?;
+                conn.query_row(
+                    &format!("{select} WHERE id = ?1"),
+                    params![project_id],
+                    read_row,
+                )
+                .optional()?
+                .ok_or_else(|| AppError::Validation(MISSING_ACTIVE_PROJECT_MESSAGE.into()))?
+            }
+        };
+
+        let supported_environments: Vec<String> = serde_json::from_str(&supported_environments)?;
+        let base_environment = resolve_preview_base_environment(
+            &saved_base_environment,
+            &supported_environments,
+            environment,
+        )?;
+        let override_count = self
+            .load_entry_overrides(&conn, &project_id)?
+            .values()
+            .filter(|override_environment| **override_environment != base_environment)
+            .count();
+
+        Ok(RunTargetSummary {
+            project_name: name,
+            base_environment,
+            environment_from_cli: environment.is_some(),
+            override_count,
+        })
     }
 
     pub fn get_entry_values(
