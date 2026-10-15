@@ -22,6 +22,7 @@ use model::{
 };
 use store::Store;
 use tauri::{
+    image::Image,
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::TrayIconBuilder,
     AppHandle, Emitter, Manager, State,
@@ -31,6 +32,8 @@ pub use crate::cli::run_cli;
 
 type CommandResult<T> = Result<T, String>;
 const TRAY_ID: &str = "main";
+// Monochrome template glyph rendered from icons/tray-template.svg; macOS tints it for the menu bar.
+const TRAY_ICON: Image<'static> = tauri::include_image!("./icons/tray-template.png");
 const SNAPSHOT_UPDATED_EVENT: &str = "snapshot-updated";
 const SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const SESSION_IDLE_CHECK_INTERVAL: Duration = Duration::from_secs(15);
@@ -44,7 +47,8 @@ const MENU_ITEM_PROJECT_PREFIX: &str = "project:";
 const MENU_ITEM_ENVIRONMENT_SUBMENU: &str = "environment";
 const MENU_ITEM_ENV_PREFIX: &str = "environment:";
 const MENU_ITEM_RESET_OVERRIDES: &str = "reset-overrides";
-const MENU_ITEM_MIXED_LABEL: &str = "mixed-label";
+const MENU_ITEM_STATUS_PROJECT: &str = "status-project";
+const MENU_ITEM_STATUS_ENV: &str = "status-env";
 
 struct SessionCache {
     key: Option<Vec<u8>>,
@@ -364,7 +368,7 @@ fn sync_snapshot_result(
 }
 
 fn sync_tray(app: &AppHandle, snapshot: &AppSnapshot) {
-    update_tray_title(app, snapshot);
+    update_tray_tooltip(app, snapshot);
     update_tray_menu(app, snapshot);
 }
 
@@ -383,29 +387,30 @@ fn start_idle_monitor(app: AppHandle, session: Arc<SessionState>) -> Result<(), 
         .map_err(Into::into)
 }
 
-fn tray_title(snapshot: &AppSnapshot) -> String {
-    let lock = if snapshot.locked { "\u{1F512} " } else { "" };
-    if let Some(project) = active_project(snapshot) {
-        let override_count = project.entry_overrides.len();
-        if override_count > 0 {
-            format!(
-                "{lock}[{} | {} +{}]",
-                project.name, project.active_base_environment, override_count
-            )
-        } else {
-            format!(
-                "{lock}[{} | {}]",
-                project.name, project.active_base_environment
-            )
-        }
-    } else {
-        format!("{lock}[sigyn]")
+fn tray_tooltip(snapshot: &AppSnapshot) -> String {
+    let lock = if snapshot.locked { " (locked)" } else { "" };
+    match active_project(snapshot) {
+        Some(project) => format!(
+            "sigyn{lock} — {} · {}{}",
+            project.name,
+            project.active_base_environment,
+            override_suffix(project.entry_overrides.len())
+        ),
+        None => format!("sigyn{lock}"),
     }
 }
 
-fn update_tray_title(app: &AppHandle, snapshot: &AppSnapshot) {
+fn override_suffix(override_count: usize) -> String {
+    match override_count {
+        0 => String::new(),
+        1 => " + 1 override".into(),
+        count => format!(" + {count} overrides"),
+    }
+}
+
+fn update_tray_tooltip(app: &AppHandle, snapshot: &AppSnapshot) {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
-        let _ = tray.set_title(Some(tray_title(snapshot)));
+        let _ = tray.set_tooltip(Some(tray_tooltip(snapshot)));
     }
 }
 
@@ -486,6 +491,35 @@ fn build_tray_menu<R: tauri::Runtime>(
 ) -> tauri::Result<Menu<R>> {
     let menu = Menu::new(app)?;
 
+    if let Some(project) = active_project(snapshot) {
+        let project_label = if snapshot.locked {
+            format!("{} (locked)", project.name)
+        } else {
+            project.name.clone()
+        };
+        let project_item =
+            MenuItem::with_id(app, MENU_ITEM_STATUS_PROJECT, project_label, false, None::<&str>)?;
+        let env_item = MenuItem::with_id(
+            app,
+            MENU_ITEM_STATUS_ENV,
+            format!(
+                "Default env: {}{}",
+                project.active_base_environment,
+                override_suffix(project.entry_overrides.len())
+            ),
+            false,
+            None::<&str>,
+        )?;
+        menu.append(&project_item)?;
+        menu.append(&env_item)?;
+        menu.append(&PredefinedMenuItem::separator(app)?)?;
+    } else if snapshot.locked {
+        let locked_item =
+            MenuItem::with_id(app, MENU_ITEM_STATUS_PROJECT, "sigyn is locked", false, None::<&str>)?;
+        menu.append(&locked_item)?;
+        menu.append(&PredefinedMenuItem::separator(app)?)?;
+    }
+
     if snapshot.locked {
         let unlock_item = MenuItem::with_id(app, MENU_ITEM_UNLOCK, "Unlock", true, None::<&str>)?;
         menu.append(&unlock_item)?;
@@ -496,21 +530,7 @@ fn build_tray_menu<R: tauri::Runtime>(
         menu.append(&project_menu)?;
         menu.append(&environment_menu)?;
 
-        let override_count = project.entry_overrides.len();
-        if override_count > 0 {
-            let mixed_label = MenuItem::with_id(
-                app,
-                MENU_ITEM_MIXED_LABEL,
-                format!(
-                    "Mixed — {} override{}",
-                    override_count,
-                    if override_count == 1 { "" } else { "s" }
-                ),
-                false,
-                None::<&str>,
-            )?;
-            menu.append(&mixed_label)?;
-
+        if !project.entry_overrides.is_empty() {
             let reset_item = MenuItem::with_id(
                 app,
                 MENU_ITEM_RESET_OVERRIDES,
@@ -679,7 +699,9 @@ fn build_tray(app: &mut tauri::App) -> tauri::Result<()> {
     let menu = build_tray_menu(app.handle(), &snapshot)?;
 
     TrayIconBuilder::with_id(TRAY_ID)
-        .title(tray_title(&snapshot))
+        .icon(TRAY_ICON)
+        .icon_as_template(true)
+        .tooltip(tray_tooltip(&snapshot))
         .menu(&menu)
         .on_menu_event(|app, event| {
             let _ = handle_tray_menu_action(app, event.id.as_ref());
