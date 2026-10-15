@@ -1180,6 +1180,7 @@ details[open] > .cli-setup-summary::before {
 .entry-row {
   position: relative;
   height: 2.3rem;
+  scroll-margin-top: 1.9rem;
   border-bottom: 1px solid rgba(28, 34, 43, 0.07);
   font-size: 0.8rem;
   cursor: pointer;

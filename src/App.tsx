@@ -134,6 +134,8 @@ export default function App() {
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
   const [panelDirty, setPanelDirty] = useState(false)
   const [pendingPanelExit, setPendingPanelExit] = useState<PanelExitTarget | null>(null)
+  // Bumped when values change outside the panel (imports), so an open panel refetches.
+  const [valuesRevision, setValuesRevision] = useState(0)
   const [preview, setPreview] = useState<PreviewResult | null>(null)
   const [showAddProject, setShowAddProject] = useState(false)
   const [showEditProject, setShowEditProject] = useState(false)
@@ -151,6 +153,9 @@ export default function App() {
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   function setNotice(next: Notice | null) {
+    if (next) {
+      setError(null)
+    }
     noticeSequence.current += 1
     setNoticeState(next ? { ...next, id: noticeSequence.current } : null)
   }
@@ -311,6 +316,11 @@ export default function App() {
       if (event.key === "Escape") {
         if (editing) {
           target?.blur()
+          return
+        }
+        if (pendingPanelExit) {
+          event.preventDefault()
+          setPendingPanelExit(null)
           return
         }
         if (selectedEntryId) {
@@ -613,6 +623,7 @@ export default function App() {
       })
       setSnapshot(result.snapshot)
       setPreview(null)
+      setValuesRevision((current) => current + 1)
       const parts: string[] = []
       if (result.created > 0) parts.push(`${result.created} created`)
       if (result.updated > 0) parts.push(`${result.updated} updated`)
@@ -1071,6 +1082,7 @@ export default function App() {
                     project={activeProject}
                     entry={selectedEntry}
                     status={entryStatuses[selectedEntry.id] ?? getEntryStatus(activeProject, selectedEntry)}
+                    valuesRevision={valuesRevision}
                     pendingExit={Boolean(pendingPanelExit)}
                     onConfirmExit={() => {
                       if (pendingPanelExit) {
@@ -1097,7 +1109,9 @@ export default function App() {
                       })
                     }
                     onCopyName={() => void handleCopyEntryName(selectedEntry.name)}
-                    onCopySecret={(value) => copySensitiveText(value, "Copied secret value.")}
+                    onCopySecret={(value) =>
+                      copySensitiveText(value, "Copied secret value.").catch(handleActionError)
+                    }
                     onLoadError={handleActionError}
                   />
                 ) : null}
@@ -1391,9 +1405,9 @@ function EnvironmentSwitcher({
   onShowOverrides: () => void
 }) {
   const usageCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
+    const counts = new Map<string, number>()
     for (const status of Object.values(statuses)) {
-      counts[status.environment] = (counts[status.environment] ?? 0) + 1
+      counts.set(status.environment, (counts.get(status.environment) ?? 0) + 1)
     }
     return counts
   }, [statuses])
@@ -1407,7 +1421,7 @@ function EnvironmentSwitcher({
       <div className="env-switch__segments" role="radiogroup" aria-label="Default environment">
         {project.supported_environments.map((environment) => {
           const isDefault = environment === project.active_base_environment
-          const count = usageCounts[environment] ?? 0
+          const count = usageCounts.get(environment) ?? 0
           const isForeign = !isDefault && count > 0
 
           return (
@@ -1540,7 +1554,7 @@ function EntryTable({
                   : formatEnvironmentLabel(environment)
               }
             >
-              {abbreviations[environment]}
+              {abbreviations.get(environment)}
             </span>
           ))}
         </span>
@@ -1676,6 +1690,7 @@ function EntryPanel({
   project,
   entry,
   status,
+  valuesRevision,
   pendingExit,
   onConfirmExit,
   onCancelExit,
@@ -1691,6 +1706,7 @@ function EntryPanel({
   project: ProjectRecord
   entry: EntryRecord
   status: EntryStatus
+  valuesRevision: number
   pendingExit: boolean
   onConfirmExit: () => void
   onCancelExit: () => void
@@ -1720,6 +1736,9 @@ function EntryPanel({
   const [valueFocused, setValueFocused] = useState<Record<string, boolean>>({})
   const dirtyRef = useRef(false)
   const syncedSignatureRef = useRef(getEntrySignature(entry))
+  const baselineRef = useRef(baselineValues)
+  baselineRef.current = baselineValues
+  const valuesRevisionRef = useRef(valuesRevision)
 
   const signature = getEntrySignature(entry)
   const metaDirty =
@@ -1729,9 +1748,9 @@ function EntryPanel({
   const valuesDirty =
     valuesLoaded &&
     project.supported_environments.some((environment) => {
-      const draft = draftValues[environment] ?? EMPTY_VALUE_DRAFT
-      const baseline = baselineValues[environment] ?? EMPTY_VALUE_DRAFT
-      return draft.present !== baseline.present || (draft.present && draft.value !== baseline.value)
+      const draft = ownValue(draftValues, environment) ?? EMPTY_VALUE_DRAFT
+      const baseline = ownValue(baselineValues, environment) ?? EMPTY_VALUE_DRAFT
+      return !sameValueDraft(draft, baseline)
     })
   const dirty = metaDirty || valuesDirty
 
@@ -1788,6 +1807,53 @@ function EntryPanel({
     }
   }, [signature])
 
+  useEffect(() => {
+    // Values changed elsewhere (an import). Refetch, keep any env the user has
+    // edited, and take the new value everywhere else.
+    if (valuesRevision === valuesRevisionRef.current) {
+      return undefined
+    }
+    valuesRevisionRef.current = valuesRevision
+    if (!valuesLoaded) {
+      setReloadToken((current) => current + 1)
+      return undefined
+    }
+
+    let cancelled = false
+    getEntryValues(project.id, entry.id)
+      .then((result) => {
+        if (cancelled) {
+          return
+        }
+        const loaded = buildEntryDraftValues(project, entry)
+        for (const item of result.values) {
+          loaded[item.environment] = { present: true, value: item.value }
+        }
+        const previousBaseline = baselineRef.current
+        setDraftValues((current) => {
+          let next = current
+          for (const environment of project.supported_environments) {
+            const draft = ownValue(current, environment) ?? EMPTY_VALUE_DRAFT
+            const before = ownValue(previousBaseline, environment) ?? EMPTY_VALUE_DRAFT
+            if (sameValueDraft(draft, before)) {
+              next = { ...next, [environment]: ownValue(loaded, environment) ?? EMPTY_VALUE_DRAFT }
+            }
+          }
+          return next
+        })
+        setBaselineValues(loaded)
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          onLoadError(caught)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [valuesRevision])
+
   async function handleSave() {
     if (!dirty || saving || !valuesLoaded) {
       return
@@ -1803,8 +1869,8 @@ function EntryPanel({
         description: draftDescription || null,
         values: project.supported_environments.map((environment) => ({
           environment,
-          present: draftValues[environment]?.present ?? false,
-          value: draftValues[environment]?.value ?? "",
+          present: ownValue(draftValues, environment)?.present ?? false,
+          value: ownValue(draftValues, environment)?.value ?? "",
         })),
       })
       if (saved) {
@@ -1929,10 +1995,11 @@ function EntryPanel({
           </div>
           <div className="panel-values" role="radiogroup" aria-label={`Source for ${entry.name}`}>
             {project.supported_environments.map((environment) => {
-              const draft = draftValues[environment] ?? EMPTY_VALUE_DRAFT
+              const draft = ownValue(draftValues, environment) ?? EMPTY_VALUE_DRAFT
               const isActive = status.environment === environment
               const isDefault = environment === project.active_base_environment
-              const isMasked = draft.present && !revealed[environment]
+              const isRevealed = ownValue(revealed, environment) === true
+              const isMasked = draft.present && !isRevealed
 
               return (
                 <div
@@ -1965,7 +2032,7 @@ function EntryPanel({
                     value={
                       isMasked
                         ? OBSCURED_SECRET_MASK
-                        : valueFocused[environment]
+                        : ownValue(valueFocused, environment)
                           ? draft.value
                           : displayWhitespace(draft.value)
                     }
@@ -2002,13 +2069,13 @@ function EntryPanel({
                       onClick={() =>
                         setRevealed((current) => ({
                           ...current,
-                          [environment]: !current[environment],
+                          [environment]: ownValue(current, environment) !== true,
                         }))
                       }
-                      aria-label={revealed[environment] ? "Hide value" : "Reveal value"}
-                      title={revealed[environment] ? "Hide" : "Reveal"}
+                      aria-label={isRevealed ? "Hide value" : "Reveal value"}
+                      title={isRevealed ? "Hide" : "Reveal"}
                     >
-                      {revealed[environment] ? <EyeOff size={13} /> : <Eye size={13} />}
+                      {isRevealed ? <EyeOff size={13} /> : <Eye size={13} />}
                     </button>
                     <button
                       className="icon-button icon-button--xs"
@@ -2437,8 +2504,9 @@ function EntryDialog({
       <div className="env-value-section-label">ENVIRONMENT VALUES</div>
       <div className="env-value-list">
         {project.supported_environments.map((environment) => {
-          const draft = values[environment] ?? { present: false, value: "" }
-          const isMasked = draft.present && !revealed[environment]
+          const draft = ownValue(values, environment) ?? EMPTY_VALUE_DRAFT
+          const isRevealed = ownValue(revealed, environment) === true
+          const isMasked = draft.present && !isRevealed
           return (
             <div key={environment} className="env-value-row">
               <div className="env-value-row__label env-value-row__label--static">
@@ -2461,7 +2529,7 @@ function EntryDialog({
                 value={
                   isMasked
                     ? OBSCURED_SECRET_MASK
-                    : valueFocused[environment]
+                    : ownValue(valueFocused, environment)
                       ? draft.value
                       : displayWhitespace(draft.value)
                 }
@@ -2504,12 +2572,12 @@ function EntryDialog({
                   onClick={() =>
                     setRevealed((current) => ({
                       ...current,
-                      [environment]: !current[environment],
+                      [environment]: ownValue(current, environment) !== true,
                     }))
                   }
-                  aria-label={revealed[environment] ? "Hide" : "Reveal"}
+                  aria-label={isRevealed ? "Hide" : "Reveal"}
                 >
-                  {revealed[environment] ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {isRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
                 <button
                   className="icon-button icon-button--sm"
@@ -2545,8 +2613,8 @@ function EntryDialog({
               description: description || null,
               values: project.supported_environments.map((environment) => ({
                 environment,
-                present: values[environment]?.present ?? false,
-                value: values[environment]?.value ?? "",
+                present: ownValue(values, environment)?.present ?? false,
+                value: ownValue(values, environment)?.value ?? "",
               })),
             })
           }
@@ -2907,6 +2975,12 @@ function ToastViewport({
   )
 }
 
+// Env names are user-defined, so `constructor` or `__proto__` must not resolve to
+// inherited Object members when used as record keys.
+function ownValue<T>(record: Record<string, T>, key: string): T | undefined {
+  return Object.hasOwn(record, key) ? record[key] : undefined
+}
+
 function getEntryStatus(project: ProjectRecord, entry: EntryRecord): EntryStatus {
   const environment = getSelectedEnvironment(project, entry.id)
   return {
@@ -2927,6 +3001,10 @@ function describeEntryStatus(project: ProjectRecord, entry: EntryRecord, status:
   return entry.name
 }
 
+function sameValueDraft(left: ValueDraft, right: ValueDraft) {
+  return left.present === right.present && (!left.present || left.value === right.value)
+}
+
 function getEntrySignature(entry: EntryRecord) {
   return JSON.stringify([
     entry.name,
@@ -2937,12 +3015,12 @@ function getEntrySignature(entry: EntryRecord) {
 }
 
 function abbreviateEnvironments(environments: string[]) {
-  const result: Record<string, string> = {}
+  const result = new Map<string, string>()
   const used = new Set<string>()
 
   for (const environment of environments) {
     const compact = environment.replace(/[^a-z0-9]/gi, "").toUpperCase() || environment.toUpperCase()
-    let abbreviation = ENV_ABBREVIATIONS[environment] ?? compact.slice(0, 3)
+    let abbreviation = ownValue(ENV_ABBREVIATIONS, environment) ?? compact.slice(0, 3)
     let length = 3
     while (used.has(abbreviation) && length < Math.min(compact.length, 4)) {
       length += 1
@@ -2955,7 +3033,7 @@ function abbreviateEnvironments(environments: string[]) {
       suffix += 1
     }
     used.add(abbreviation)
-    result[environment] = abbreviation
+    result.set(environment, abbreviation)
   }
 
   return result
